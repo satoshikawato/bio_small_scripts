@@ -5,7 +5,6 @@ import sys
 import os
 import argparse
 from collections import defaultdict
-import pandas as pd
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
