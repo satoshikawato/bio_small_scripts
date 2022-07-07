@@ -124,8 +124,6 @@ def main():
     if len(nt) != 2:
         nt = "GC"
     nt_list = list(nt)
-    window = 1000
-    step = 100
     records = fasta_to_records(in_fa)
     for record in records:
         df = skew_df(record, window, step, nt)
