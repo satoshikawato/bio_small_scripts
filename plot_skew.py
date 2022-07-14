@@ -7,7 +7,6 @@ import os
 import argparse
 from Bio import SeqIO
 import pandas as pd
-import seaborn as sns
 import matplotlib.pyplot as plt
 
 
@@ -64,7 +63,7 @@ def sliding_window(seq, window, step):
         end = start + window
         if end > len(seq):
             break
-        out_seq = seq[start:end]
+        out_seq = seq[start:end].upper()
         yield start, out_seq
 
 
@@ -120,7 +119,7 @@ def main():
     in_fa = args.input
     window = args.window
     step = args.step
-    nt = args.nt
+    nt = args.nt.upper()
     if len(nt) != 2:
         nt = "GC"
     nt_list = list(nt)
