@@ -429,7 +429,7 @@ def create_intron_path_circular(radius, coord_dict, total_length, track_ratio):
     feat_strand = coord_dict['feat_strand']
     feat_start = coord_dict['feat_start']
     feat_end = coord_dict['feat_end']
-    strand_dict = {"positive": " 0 0 1 ", "negative": " 0 0 0 "}
+    strand_dict = {"positive": " 0 0 0 ", "negative": " 0 0 1 "}
     param = strand_dict[feat_strand]
     factors = compute_factors(feat_strand, track_ratio)
     start_x_1 = (radius * factors[1]) * math.cos(
