@@ -300,7 +300,7 @@ def main():
                     gene_line = [
                         seqid,
                         source,
-                        "gene",
+                        "mRNA",
                         feature_start,
                         feature_end,
                         score,
