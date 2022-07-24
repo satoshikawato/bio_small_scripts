@@ -78,19 +78,22 @@ def get_orf(record, trans_table, min_protein_length):
                 aa_end = trans.find("*", aa_start)
                 if aa_end == -1:
                     aa_end = trans_len
-                    break
                 if aa_end - aa_start >= min_protein_length:
                     if strand == 1:
                         start = frame + aa_start * 3
                         end = min(seq_len, frame + aa_end * 3 + 3)
+                        print(strand, frame, start, end)
                         cds_seq = seq[start:end]
                     else:
-                        start = seq_len - frame - aa_end * 3 - 3
-                        end = seq_len - frame - aa_start * 3
+                        start =  max(0, (seq_len - (frame + aa_end * 3 + 3)))
+                        end = seq_len - (frame + aa_start * 3)
                         cds_seq = seq[start:end].reverse_complement()
+                        print(strand, frame, start, end)
                     orf_list.append(
                         [start, end, strand, trans[aa_start:aa_end], cds_seq])
                 aa_start = trans.find("M", aa_end + 1)
+                if aa_start < 0:
+                    break
     orf_list.sort()
     count = 0
     for orf in orf_list:
