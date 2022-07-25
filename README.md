@@ -92,6 +92,21 @@ optional arguments:
 ```
 ## plot_circular_genome.py
 Generate genome diagram in SVG
+```
+$ ./plot_circular_genome.py -h
+usage: plot_circular_genome.py [-h] -i INPUT [-n NT] [-w WINDOW] [-s STEP]
+
+Generate genome diagram in SVG.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INPUT, --input INPUT
+                        Genbank/DDBJ flatfile (required)
+  -n NT, --nt NT        dinucleotide (default: GC).
+  -w WINDOW, --window WINDOW
+                        window size (default: 1000)
+  -s STEP, --step STEP  step size (default: 100)
+```
 
 ## plot_skew.py
 Generate dinucleotide skew plot(s) of FASTA format DNA sequences in SVG format. Plots are saved separately for each entry in a multifasta file
