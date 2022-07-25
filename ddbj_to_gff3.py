@@ -223,7 +223,6 @@ def main():
                         continue
                     else:
                         new_notes += "note={};".format(note)
-                        break
                 if gene_biotype == 'rRNA':
                     gene_qualifiers = "ID={};product={};gene_biotype={};".format(
                         locus_id, product, gene_biotype)
