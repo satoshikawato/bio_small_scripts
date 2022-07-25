@@ -199,8 +199,8 @@ def add_func_to_cds(features, blast_dict, func_tbl, prefix):
             note_strs = ""
             for note in new_qualifiers["note"]:
                 note_strs += "note={};".format(note)
-            out_qualifiers = "ID={};{}product={};".format(
-                new_qualifiers["ID"], note_strs, new_qualifiers["product"])
+            out_qualifiers = "{}product={};".format(
+                note_strs, new_qualifiers["product"])
             out_feature_line = feature[0:8]
             out_feature_line.append(out_qualifiers)
             out_feature_line = '\t'.join(out_feature_line)
