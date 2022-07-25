@@ -4,6 +4,11 @@
 # Basically rewrite of this:
 # Biopython Tutorial and Cookbook 20.1.13 Identifying open reading frames
 # http://biopython.org/DIST/docs/tutorial/Tutorial.html#sec384
+# Motivations:
+# 1. Allow overlaps
+# 2. Output in GFF3
+# 3. Customizability
+
 
 import sys
 import os
@@ -82,13 +87,11 @@ def get_orf(record, trans_table, min_protein_length):
                     if strand == 1:
                         start = frame + aa_start * 3
                         end = min(seq_len, frame + aa_end * 3 + 3)
-                        print(strand, frame, start, end)
                         cds_seq = seq[start:end]
                     else:
                         start =  max(0, (seq_len - (frame + aa_end * 3 + 3)))
                         end = seq_len - (frame + aa_start * 3)
                         cds_seq = seq[start:end].reverse_complement()
-                        print(strand, frame, start, end)
                     orf_list.append(
                         [start, end, strand, trans[aa_start:aa_end], cds_seq])
                 aa_start = trans.find("M", aa_end + 1)
