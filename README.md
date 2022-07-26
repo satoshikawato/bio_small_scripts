@@ -127,7 +127,7 @@ optional arguments:
 ```
 Example: [Escherichia coli str. K-12 substr. MG1655, complete genome NC_000913.3](https://www.ncbi.nlm.nih.gov/nuccore/NC_000913.3?report=fasta)
 ```
-$ ./plot_skew.py ./plot_skew.py NC_000913.3.fasta # (output: NC_000913.3.svg)
+$ ./plot_skew.py NC_000913.3.fasta # (output: NC_000913.3.svg)
 ```
 ![NC_000913 3](https://user-images.githubusercontent.com/58936715/180006455-c88b7461-6796-4517-aec3-b75281620441.png)
 
