@@ -7,7 +7,6 @@ import os
 import argparse
 from Bio import SeqIO
 import pandas as pd
-import seaborn as sns
 import matplotlib.pyplot as plt
 
 
