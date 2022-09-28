@@ -7,12 +7,13 @@ import os
 import argparse
 from Bio import SeqIO
 import pandas as pd
+import seaborn as sns
 import matplotlib.pyplot as plt
 
 
 def _get_args():
     parser = argparse.ArgumentParser(
-        description='Generate dinucleotide skew plot(s) of FASTA format DNA sequences in SVG format. Plots are saved separately for each entry in a multifasta file')
+        description='Generate GC skew plot in SVG. Multiple SVG files produced if multi-FASTA file is provided')
     parser.add_argument(
         '-i',
         '--input',
@@ -63,7 +64,7 @@ def sliding_window(seq, window, step):
         end = start + window
         if end > len(seq):
             break
-        out_seq = seq[start:end].upper()
+        out_seq = seq[start:end]
         yield start, out_seq
 
 
@@ -100,7 +101,9 @@ def draw_plot(record, df):
     ax.ticklabel_format(style='plain', axis='both')
     ax.tick_params(axis="both", labelsize=20)
     coordinate_of_max_cumulative_skew = df.iloc[:, 1].idxmax()
+    coordinate_of_min_cumulative_skew = df.iloc[:, 1].idxmin()
     max_cumulative_skew = df.iloc[:, 1].max()
+    min_cumulative_skew = df.iloc[:, 1].min()
     fig.tight_layout()
     ax.plot(df)
     ax.axvline(x=coordinate_of_max_cumulative_skew, color="red")
@@ -108,6 +111,12 @@ def draw_plot(record, df):
         x=coordinate_of_max_cumulative_skew,
         y=max_cumulative_skew * 0.8,
         s=coordinate_of_max_cumulative_skew,
+        fontsize=20)
+    ax.axvline(x=coordinate_of_min_cumulative_skew, color="red")
+    ax.text(
+        x=coordinate_of_min_cumulative_skew,
+        y=min_cumulative_skew * 1.4,
+        s=coordinate_of_min_cumulative_skew,
         fontsize=20)
     ax.legend(df.columns, fontsize=20)
     filename = "{}.svg".format(record_id)
@@ -119,10 +128,12 @@ def main():
     in_fa = args.input
     window = args.window
     step = args.step
-    nt = args.nt.upper()
+    nt = args.nt
     if len(nt) != 2:
         nt = "GC"
     nt_list = list(nt)
+    window = 1000
+    step = 100
     records = fasta_to_records(in_fa)
     for record in records:
         df = skew_df(record, window, step, nt)
