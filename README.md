@@ -129,6 +129,6 @@ Example: [Escherichia coli str. K-12 substr. MG1655, complete genome NC_000913.3
 ```
 $ ./plot_skew.py NC_000913.3.fasta # (output: NC_000913.3.svg)
 ```
-![NC_000913 3](https://user-images.githubusercontent.com/58936715/180006455-c88b7461-6796-4517-aec3-b75281620441.png)
-
+![NC_000913 3](https://user-images.githubusercontent.com/58936715/192764584-f21297c2-8595-40c4-baae-20d6aab5575e.svg)
 ## vcf_to_sv_density_plot.py
+
