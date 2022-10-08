@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-
 import sys
 import os
 import re
+import argparse
+import pandas as pd
 import math
 from math import pi
 import svgwrite
@@ -12,37 +13,37 @@ from svgwrite.shapes import Circle
 from svgwrite.path import Path
 from svgwrite.text import Text
 from svgwrite.masking import ClipPath, Mask
-import argparse
 from svgwrite.container import Group
-import pandas as pd
 from Bio import SeqIO
 from Bio.SeqFeature import FeatureLocation
 
 
 class GeneObject:
-    def __init__(self, gene_id, location, product, color, gene_biotype):
+    def __init__(self, gene_id, location, product, color, gene_biotype, note):
         self.gene_id = gene_id
         self.location = location
         self.product = product
         self.color = color
         self.gene_biotype = gene_biotype
+        self.note = note
 
 
 class RepeatObject:
-    def __init__(self, repeat_id, location, rpt_family, color, rpt_type):
+    def __init__(self, repeat_id, location, rpt_family, color, rpt_type, note):
         self.repeat_id = repeat_id
         self.location = location
         self.rpt_family = rpt_family
         self.color = color
         self.rpt_type = rpt_type
+        self.note = note
 
 
 class FeatureObject:
-    def __init__(self, feature_id, location, note, color):
+    def __init__(self, feature_id, location, color, note):
         self.feature_id = feature_id
         self.location = location
-        self.note = note
         self.color = color
+        self.note = note
 
 
 def _get_args():
@@ -54,6 +55,11 @@ def _get_args():
         help='Genbank/DDBJ flatfile (required)',
         type=str,
         required=True)
+    parser.add_argument(
+        '-t',
+        '--table',
+        help='color table (optional)',
+        type=str)
     parser.add_argument(
         '-n',
         '--nt',
@@ -76,6 +82,7 @@ def _get_args():
         parser.print_help(sys.stderr)
         sys.exit(1)
     args = parser.parse_args()
+    #args = parser.parse_args(args=['-i', 'CN01.gb', '-t', 'color_table.txt'])
     return args
 
 
@@ -132,8 +139,8 @@ def skew_df(record, window, step, nt):
     content_legend = "{} content".format(nt)
     skew_legend = "{} skew".format(nt)
     cumulative_skew_legend = "Cumulative {} skew, normalized".format(nt)
-    df = pd.DataFrame({content_legend: pd.Series(content_dict), skew_legend: pd.Series(skew_dict),
-                       cumulative_skew_legend: pd.Series(skew_cumulative_dict)})
+    df = pd.DataFrame({content_legend: pd.Series(content_dict), skew_legend: pd.Series(
+        skew_dict), cumulative_skew_legend: pd.Series(skew_cumulative_dict)})
     return df
 
 
@@ -318,29 +325,52 @@ def set_arrow_shoulder(feat_strand, arrow_end, cds_arrow_length):
     return shoulder
 
 
-def create_gene_object(feature_id, feature):
-    exon_coordinates = feature.location.parts
-
-    product = feature.qualifiers['product'][0]
+def get_gene_biotype(feature):
     if feature.type == 'CDS':
         gene_biotype = "protein_coding"
-        color = "#47b8f8"
     elif feature.type == 'rRNA':
         gene_biotype = "rRNA"
-        color = "#009e73"
     elif feature.type == 'tRNA':
         gene_biotype = "tRNA"
-        color = "#e69f00"
     else:
         gene_biotype = "undefined"
+    return gene_biotype
+
+
+def get_color(feature, color_table):
+    # Set default color
+    gene_biotype = get_gene_biotype(feature)
+    if gene_biotype == "protein_coding":
+        color = "#47b8f8"
+    elif gene_biotype == "rRNA":
+        color = "#009e73"
+    elif gene_biotype == "tRNA":
+        color = "#e69f00"
+    else:
         color = "gray"
+
+    # Apply feature-specific color
+    target_row = color_table[(color_table['feature_type'] == feature.type) & (color_table['qualifier_key'] == "note") & (
+        color_table['value'].isin(feature.qualifiers['note'])) & (color_table['color'].notna())]
+    if (len(target_row) == 1):
+        color = target_row['color'].tolist()[0]
+    return color
+
+
+def create_gene_object(feature_id, feature, color_table):
+    exon_coordinates = feature.location.parts
+    note = list(feature.qualifiers['note'])
+    product = feature.qualifiers['product'][0]
+    gene_biotype = get_gene_biotype(feature)
+    color = get_color(feature, color_table)
     exon_list = get_exon_and_intron_coordinates(exon_coordinates)
     gene_object = GeneObject(
         feature_id,
         exon_list,
         product,
         color,
-        gene_biotype)
+        gene_biotype,
+        note)
     return gene_object
 
 
@@ -354,9 +384,10 @@ def create_repeat_object(repeat_id, feature):
             rpt_family = "undefined"
         color = "#d3d3d3"
         rpt_type = feature.qualifiers['rpt_type'][0]
+        note = list(feature.qualifiers['note'])
         location = get_exon_and_intron_coordinates(coordinates)
         repeat_object = RepeatObject(
-            repeat_id, location, rpt_family, color, rpt_type)
+            repeat_id, location, rpt_family, color, rpt_type, note)
     else:
         raise ValueError("feature not repeat")
     return repeat_object
@@ -371,13 +402,14 @@ def create_feature_object(feature_id, feature):
             note = "undefined"
         color = "#d3d3d3"
         location = get_exon_and_intron_coordinates(coordinates)
-        feature_object = FeatureObject(feature_id, location, note, color)
+        note = list(feature.qualifiers['note'])
+        feature_object = FeatureObject(feature_id, location, note, color, note)
     else:
         raise ValueError("feature not misc_feature")
     return feature_object
 
 
-def create_feature_dict(gb_record):
+def create_feature_dict(gb_record, color_table):
     feature_dict = {}
     locus_count = 0
     repeat_count = 0
@@ -387,7 +419,7 @@ def create_feature_dict(gb_record):
                 feature.type == 'rRNA') or (feature.type == 'tRNA'):
             locus_count = locus_count + 1
             locus_id = "gene_" + str(locus_count).zfill(3)
-            gene_object = create_gene_object(locus_id, feature)
+            gene_object = create_gene_object(locus_id, feature, color_table)
             feature_dict[locus_id] = gene_object
         elif feature.type == 'repeat_region':
             repeat_count = repeat_count + 1
@@ -474,14 +506,14 @@ def create_arrowhead_path_circular(
             radius * factors[1]) * math.cos(math.radians(360.0 * (arrow_end / total_length) - 90))
         point_y = (
             radius * factors[1]) * math.sin(math.radians(360.0 * (arrow_end / total_length) - 90))
-        start_x_1 = (
-            radius * factors[0]) * math.cos(math.radians(360.0 * (arrow_start / total_length) - 90))
-        start_y_1 = (
-            radius * factors[0]) * math.sin(math.radians(360.0 * (arrow_start / total_length) - 90))
-        start_x_2 = (
-            radius * factors[2]) * math.cos(math.radians(360.0 * (arrow_start / total_length) - 90))
-        start_y_2 = (
-            radius * factors[2]) * math.sin(math.radians(360.0 * (arrow_start / total_length) - 90))
+        start_x_1 = (radius * factors[0]) * math.cos(
+            math.radians(360.0 * (arrow_start / total_length) - 90))
+        start_y_1 = (radius * factors[0]) * math.sin(
+            math.radians(360.0 * (arrow_start / total_length) - 90))
+        start_x_2 = (radius * factors[2]) * math.cos(
+            math.radians(360.0 * (arrow_start / total_length) - 90))
+        start_y_2 = (radius * factors[2]) * math.sin(
+            math.radians(360.0 * (arrow_start / total_length) - 90))
         feature_path = "M " + str(start_x_1) + "," + str(start_y_1) + " L" + str(
             point_x) + "," + str(point_y) + " L" + str(start_x_2) + "," + str(start_y_2) + " z"
     else:
@@ -489,14 +521,14 @@ def create_arrowhead_path_circular(
             radius * factors[1]) * math.cos(math.radians(360.0 * (arrow_end / total_length) - 90))
         point_y = (
             radius * factors[1]) * math.sin(math.radians(360.0 * (arrow_end / total_length) - 90))
-        start_x_1 = (
-            radius * factors[0]) * math.cos(math.radians(360.0 * (arrow_start / total_length) - 90))
-        start_y_1 = (
-            radius * factors[0]) * math.sin(math.radians(360.0 * (arrow_start / total_length) - 90))
-        start_x_2 = (
-            radius * factors[2]) * math.cos(math.radians(360.0 * (arrow_start / total_length) - 90))
-        start_y_2 = (
-            radius * factors[2]) * math.sin(math.radians(360.0 * (arrow_start / total_length) - 90))
+        start_x_1 = (radius * factors[0]) * math.cos(
+            math.radians(360.0 * (arrow_start / total_length) - 90))
+        start_y_1 = (radius * factors[0]) * math.sin(
+            math.radians(360.0 * (arrow_start / total_length) - 90))
+        start_x_2 = (radius * factors[2]) * math.cos(
+            math.radians(360.0 * (arrow_start / total_length) - 90))
+        start_y_2 = (radius * factors[2]) * math.sin(
+            math.radians(360.0 * (arrow_start / total_length) - 90))
         end_x_1 = (
             radius * factors[0]) * math.cos(math.radians(360.0 * ((shoulder) / total_length) - 90))
         end_y_1 = (
@@ -569,7 +601,7 @@ def create_gene_path_circular(gene_object, total_length, radius, track_ratio):
             coord_path = create_intron_path_circular(
                 radius, coord_dict, total_length, track_ratio)
         elif feat_type == "exon":
-            if coord[5] == True:
+            if coord[5]:
                 coord_path = create_arrowhead_path_circular(
                     radius, coord_dict, total_length, cds_arrow_length, track_ratio)
             elif coord[5] == False:
@@ -607,8 +639,7 @@ def create_tick_paths_list(ticks, tick_width, size, total_len, radius):
         dist_y = (radius * dist) * \
             math.sin(math.radians(360.0 * (tick / total_len) - 90))
         tick_path_desc = "M " + \
-            str(prox_x) + "," + str(prox_y) + " L" + \
-            str(dist_x) + "," + str(dist_y) + " z"
+            str(prox_x) + "," + str(prox_y) + " L" + str(dist_x) + "," + str(dist_y) + " z"
         tick_path = Path(
             d=tick_path_desc,
             stroke='gray',
@@ -632,7 +663,6 @@ def set_tick_label_anchor_value(tick, total_len):
     else:
         raise ValueError("Abnormal angle: verify the ticks and total length")
     return anchor_value, baseline_value
-
 
 
 def create_tick_label_paths_list(ticks, size, total_len, radius):
@@ -664,7 +694,6 @@ def create_tick_label_paths_list(ticks, size, total_len, radius):
     return tick_label_paths_list
 
 
-
 def ticks_cicular(gb_record, radius):
     total_len = len(gb_record.seq)
     if total_len <= 100000:
@@ -692,12 +721,6 @@ def ticks_cicular(gb_record, radius):
         tick_group.add(tick_path_large)
     for tick_label_path_large in tick_label_paths_large:
         tick_group.add(tick_label_path_large)
-    '''
-    for tick_path_small in tick_paths_small:
-        tick_group.add(tick_path_small)
-    for tick_label_path_small in tick_label_paths_small:
-        tick_group.add(tick_label_path_small)
-    '''
     return tick_group
 
 
@@ -790,10 +813,10 @@ def record_definition(record, radius):
     return definition_group
 
 
-def record_circular(gb_record, radius, track_ratio):
+def record_circular(gb_record, radius, track_ratio, color_table):
     total_len = len(gb_record.seq)
     record_group = Group(id="record")
-    feature_dict = create_feature_dict(gb_record)
+    feature_dict = create_feature_dict(gb_record, color_table)
     for key in feature_dict:
         feature_object = feature_dict[key]
         if isinstance(feature_object, GeneObject):
@@ -909,14 +932,26 @@ def gc_content_circular(gb_record, radius, df, track_width):
 
 
 def create_canvas(file_name, total_width, total_height):
-    dwg = svgwrite.Drawing(filename=file_name + ".svg", size=(str(total_width) + 'px', str(total_height) + 'px'),
-                           viewBox=('0 0 ' + str(total_width) + ' ' + str(total_height)))
+    dwg = svgwrite.Drawing(
+        filename=file_name +
+        ".svg",
+        size=(
+            str(total_width) +
+            'px',
+            str(total_height) +
+            'px'),
+        viewBox=(
+            '0 0 ' +
+            str(total_width) +
+            ' ' +
+            str(total_height)))
     return dwg
 
 
-def plot_genome_diagram(gb_record, window, step, dinucleotide):
+def plot_genome_diagram(gb_record, window, step, dinucleotide, color_table):
     record_name = gb_record.annotations["source"]
     accession = str(gb_record.annotations["accessions"][0])
+    color_table = color_table[color_table['locus'] == accession]
     total_width = 1000
     total_height = 1000
     radius = 300
@@ -927,7 +962,7 @@ def plot_genome_diagram(gb_record, window, step, dinucleotide):
     axis_group = add_circular_axis(radius)
     axis_group.translate(total_width / 2, total_height / 2)
 
-    record_group = record_circular(gb_record, radius, track_ratio)
+    record_group = record_circular(gb_record, radius, track_ratio, color_table)
     definition_group = record_definition(gb_record, radius)
     tick_group = ticks_cicular(gb_record, radius)
     skew_group = skew_circular(gb_record, radius, df, track_width)
@@ -956,11 +991,20 @@ def main():
     dinucleotide = args.nt
     window = args.window
     step = args.step
+    color_table = args.table
+    color_table = pd.read_csv(
+        color_table,
+        sep='\t',
+        names=(
+            'locus',
+            'feature_type',
+            'qualifier_key',
+            'value',
+            'color'))
     gb_records = SeqIO.parse(input_file, 'genbank')
     for gb_record in gb_records:
-        plot_genome_diagram(gb_record, window, step, dinucleotide)
+        plot_genome_diagram(gb_record, window, step, dinucleotide, color_table)
 
 
 if __name__ == "__main__":
     main()
-
