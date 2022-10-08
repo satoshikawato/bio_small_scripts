@@ -16,7 +16,7 @@ import svgwrite
 import pandas as pd
 
 from svgwrite.container import Group
-from svgwrite.shapes import  Line
+from svgwrite.shapes import Line
 from svgwrite.path import Path
 from svgwrite.text import Text
 
@@ -34,20 +34,78 @@ handler.setLevel(logging.INFO)
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
+
 def _get_args():
     parser = argparse.ArgumentParser(description='Generate  plot in SVG')
-    parser.add_argument('-i','--input',help='genbank (required)',type=str,required=True,nargs='*')
-    parser.add_argument('-b','--blast',help="input BLAST result file in tab-separated format (-outfmt 6 or 7) (optional)",type=str,nargs='*')
-    parser.add_argument('-o','--output',help='output prefix (default: diagram)',type=str,default="diagram")
-    parser.add_argument('-n','--nt',help='dinucleotide (default: GC). ',type=str,default="GC")
-    parser.add_argument('-w','--window',help='window size (default: 1000) ',type=int,default="1000")
-    parser.add_argument('-s','--step',help='step size (default: 100) ',type=int,default="100")
-    parser.add_argument('--separate_strands',help='separate forward and reverse strands (default: False). Features of undefined strands are shown on the forward strand. ',action='store_true')
-    parser.add_argument('--show_gc',help='plot GC content below genome (default: False). ',action='store_true')
-    parser.add_argument('--align_center',help='Align genomes to the center (default: False). ',action='store_true')
-    parser.add_argument('--evalue',help='evalue threshold (default=10)',type=float, default="10")
-    parser.add_argument('--bitscore',help='bitscore threshold (default=0)',type=float, default="0")
-    parser.add_argument('--identity',help='identity threshold (default=0)',type=float, default="0")
+    parser.add_argument(
+        '-i',
+        '--input',
+        help='genbank (required)',
+        type=str,
+        required=True,
+        nargs='*')
+    parser.add_argument(
+        '-b',
+        '--blast',
+        help="input BLAST result file in tab-separated format (-outfmt 6 or 7) (optional)",
+        type=str,
+        nargs='*')
+    parser.add_argument(
+        '-t',
+        '--table',
+        help='color table (optional)',
+        type=str)
+    parser.add_argument(
+        '-o',
+        '--output',
+        help='output prefix (default: diagram)',
+        type=str,
+        default="diagram")
+    parser.add_argument(
+        '-n',
+        '--nt',
+        help='dinucleotide (default: GC). ',
+        type=str,
+        default="GC")
+    parser.add_argument(
+        '-w',
+        '--window',
+        help='window size (default: 1000) ',
+        type=int,
+        default="1000")
+    parser.add_argument(
+        '-s',
+        '--step',
+        help='step size (default: 100) ',
+        type=int,
+        default="100")
+    parser.add_argument(
+        '--separate_strands',
+        help='separate forward and reverse strands (default: False). Features of undefined strands are shown on the forward strand. ',
+        action='store_true')
+    parser.add_argument(
+        '--show_gc',
+        help='plot GC content below genome (default: False). ',
+        action='store_true')
+    parser.add_argument(
+        '--align_center',
+        help='Align genomes to the center (default: False). ',
+        action='store_true')
+    parser.add_argument(
+        '--evalue',
+        help='evalue threshold (default=1e-2)',
+        type=float,
+        default="10")
+    parser.add_argument(
+        '--bitscore',
+        help='bitscore threshold (default=50)',
+        type=float,
+        default="0")
+    parser.add_argument(
+        '--identity',
+        help='identity threshold (default=0)',
+        type=float,
+        default="0")
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
@@ -56,34 +114,32 @@ def _get_args():
 
 
 class GeneObject:
-    def __init__(self, gene_id, location, product, color, gene_biotype):
+    def __init__(self, gene_id, location, product, color, gene_biotype, note):
         self.gene_id = gene_id
         self.location = location
         self.product = product
         self.color = color
         self.gene_biotype = gene_biotype
+        self.note = note
+
 
 class RepeatObject:
-    def __init__(self, repeat_id, location, rpt_family, color, rpt_type):
+    def __init__(self, repeat_id, location, rpt_family, color, rpt_type, note):
         self.repeat_id = repeat_id
         self.location = location
         self.rpt_family = rpt_family
         self.color = color
         self.rpt_type = rpt_type
-        
+        self.note = note
+
+
 class FeatureObject:
-    def __init__(self, feature_id, location, note, color):
+    def __init__(self, feature_id, location, color, note):
         self.feature_id = feature_id
         self.location = location
-        self.note = note
         self.color = color
+        self.note = note
 
-"""
-wsv_dict = {}
-with open('2022-07-31_wsv.list', 'r') as csv_file:
-    for row in csv.reader(csv_file, delimiter='\t'):
-        wsv_dict[row[0]] = row[1]
-"""
 
 def load_gbks(gbk_list):
     """Load the first instance of GenBank as SerRecord
@@ -100,12 +156,14 @@ def load_gbks(gbk_list):
         print(record)
     return record_list
 
+
 def calculate_gc_percent(sequence):
     g_count = sequence.count("G")
     c_count = sequence.count("C")
     gc_percent = 100 * ((g_count + c_count) / len(sequence))
     gc_percent = round(gc_percent, 2)
     return gc_percent
+
 
 def sliding_window(seq, window, step):
     for start in range(0, len(seq), step):
@@ -118,12 +176,14 @@ def sliding_window(seq, window, step):
             out_seq = seq[start:end]
         yield start, out_seq
 
+
 def calculate_dinucleotide_skew(seq, base1, base2):
     "Return dinucleotide skew in a given sequence"
     base1_count = seq.count(base1)
     base2_count = seq.count(base2)
     skew = ((base1_count - base2_count) / (base1_count + base2_count))
     return skew
+
 
 def skew_df(record, window, step, nt):
     nt_list = list(nt)
@@ -153,12 +213,16 @@ def skew_df(record, window, step, nt):
     content_legend = "{} content".format(nt)
     skew_legend = "{} skew".format(nt)
     cumulative_skew_legend = "Cumulative {} skew, normalized".format(nt)
-    df = pd.DataFrame({content_legend: pd.Series(content_dict), skew_legend: pd.Series(skew_dict),
-                       cumulative_skew_legend: pd.Series(skew_cumulative_dict)})
+    df = pd.DataFrame({content_legend: pd.Series(content_dict), skew_legend: pd.Series(
+        skew_dict), cumulative_skew_legend: pd.Series(skew_cumulative_dict)})
     return df
 
 
-def load_comparisons(comparison_files, evalue_threshold, bitscore_threshold, identity_threshold):
+def load_comparisons(
+        comparison_files,
+        evalue_threshold,
+        bitscore_threshold,
+        identity_threshold):
     """
     Load tab-separated comparsion files
     Args:
@@ -195,6 +259,7 @@ def load_comparisons(comparison_files, evalue_threshold, bitscore_threshold, ide
         comparison_list.append(df)
     return comparison_list
 
+
 def gbk_to_seqrecords(gbk_list):
     """Load the first instance of GenBank as SerRecord
     Args:
@@ -210,29 +275,61 @@ def gbk_to_seqrecords(gbk_list):
     return record_list
 
 
-def create_gene_object(feature_id, feature):
-    exon_coordinates = feature.location.parts
-    note = feature.qualifiers['product']
+def get_gene_biotype(feature):
     if feature.type == 'CDS':
         gene_biotype = "protein_coding"
-        color = get_product_color(note)
     elif feature.type == 'rRNA':
         gene_biotype = "rRNA"
-        color = "#009e73"
     elif feature.type == 'tRNA':
         gene_biotype = "tRNA"
-        color = "#e69f00"
     else:
         gene_biotype = "undefined"
+    return gene_biotype
+
+
+def get_color(feature, color_table):
+    # Set default color
+    gene_biotype = get_gene_biotype(feature)
+    if gene_biotype == "protein_coding":
+        # color = "#47b8f8"
+        color = "lightgray"
+    elif gene_biotype == "rRNA":
+        color = "#009e73"
+    elif gene_biotype == "tRNA":
+        color = "#e69f00"
+    else:
         color = "gray"
+    if 'note' in feature.qualifiers.keys():
+        note = feature.qualifiers['note'][0]
+    else:
+        note = "none"
+    # Apply feature-specific color
+    target_row = color_table[(color_table['feature_type'] == feature.type) & (color_table['qualifier_key'] == "note") & (
+        color_table['value'].str.contains(note)) & (color_table['color'].notna())]
+    if (len(target_row) == 1):
+        color = target_row['color'].tolist()[0]
+    return color
+
+
+def create_gene_object(feature_id, feature, color_table):
+    exon_coordinates = feature.location.parts
+    if 'note' in feature.qualifiers.keys():
+        note = feature.qualifiers['note'][0]
+    else:
+        note = ""
+    product = feature.qualifiers['product'][0]
+    gene_biotype = get_gene_biotype(feature)
+    color = get_color(feature, color_table)
     exon_list = get_exon_and_intron_coordinates(exon_coordinates)
     gene_object = GeneObject(
         feature_id,
         exon_list,
-        note,
+        product,
         color,
-        gene_biotype)
+        gene_biotype,
+        note)
     return gene_object
+
 
 def create_repeat_object(repeat_id, feature):
     coordinates = feature.location.parts
@@ -243,48 +340,39 @@ def create_repeat_object(repeat_id, feature):
         else:
             rpt_family = "undefined"
         color = "#d3d3d3"
-        rpt_type = feature.qualifiers['rpt_type'][0]
+        if 'rpt_type' in feature.qualifiers.keys():
+            rpt_type = feature.qualifiers['rpt_type'][0]
+        else:
+            rpt_type = "undefined"
+        if 'note' in feature.qualifiers.keys():
+            note = feature.qualifiers['note'][0]
+        else:
+            note = ""
         location = get_exon_and_intron_coordinates(coordinates)
         repeat_object = RepeatObject(
-            repeat_id, location, rpt_family, color, rpt_type)
+            repeat_id, location, rpt_family, color, rpt_type, note)
     else:
         raise ValueError("feature not repeat")
     return repeat_object
+
 
 def create_feature_object(feature_id, feature):
     coordinates = feature.location.parts
     if feature.type == 'misc_feature':
         if 'note' in feature.qualifiers.keys():
-            note = feature.qualifiers['note'][0]
+            note = list(feature.qualifiers['note'])
         else:
-            note = "undefined"
+            note = ""
         color = "#d3d3d3"
         location = get_exon_and_intron_coordinates(coordinates)
-        feature_object = FeatureObject(feature_id, location, note, color)
+
+        feature_object = FeatureObject(feature_id, location, note, color, note)
     else:
         raise ValueError("feature not misc_feature")
     return feature_object
 
 
-def create_gene_dict(gb_record: SeqRecord) -> dict:
-    """
-    Create a dictionary of GeneObject instances found in a given SeqRecord.
-    Args:
-        gb_record (SeqRecord): SeqRecord object to be processed
-    """
-    gene_dict = {}
-    gene_id = 0
-    for feature in gb_record.features:
-        if feature.type == 'CDS':
-            gene_id = gene_id + 1
-            protein_id = "gene_" + str(gene_id).zfill(3)
-            gene_object = create_gene_object(protein_id, feature)
-            gene_dict[protein_id] = gene_object
-        else:
-            continue
-    return gene_dict
-
-def create_feature_dict(gb_record):
+def create_feature_dict(gb_record, color_table):
     feature_dict = {}
     locus_count = 0
     repeat_count = 0
@@ -294,7 +382,7 @@ def create_feature_dict(gb_record):
                 feature.type == 'rRNA') or (feature.type == 'tRNA'):
             locus_count = locus_count + 1
             locus_id = "gene_" + str(locus_count).zfill(3)
-            gene_object = create_gene_object(locus_id, feature)
+            gene_object = create_gene_object(locus_id, feature, color_table)
             feature_dict[locus_id] = gene_object
         elif feature.type == 'repeat_region':
             repeat_count = repeat_count + 1
@@ -315,6 +403,7 @@ def get_product_color(notes):
     """
     product_color = "lightgray"
     return product_color
+
 
 def get_strand(strand_value: int) -> str:
     """
@@ -351,6 +440,7 @@ def get_exon_coordinate(exon_line, exon_count, last_or_not):
         last_or_not]
     return exon_count, exon_coordinate
 
+
 def get_intron_coordinate(previous_exon, current_exon, intron_count):
     intron_count = intron_count + 1
     intron_id = str(intron_count).zfill(3)
@@ -373,6 +463,7 @@ def get_intron_coordinate(previous_exon, current_exon, intron_count):
         intron_end,
         False]
     return intron_count, intron_coordinate
+
 
 def get_exon_and_intron_coordinates(exons: list) -> list:
     exon_list = []
@@ -412,12 +503,14 @@ def get_exon_and_intron_coordinates(exons: list) -> list:
                     exon_list.append(exon_coord)
     return exon_list
 
+
 def set_arrow_shoulder(feat_strand, arrow_end, cds_arrow_length) -> int:
     if feat_strand == "positive":
         shoulder = int(arrow_end - cds_arrow_length)
     else:
         shoulder = int(arrow_end + cds_arrow_length)
     return shoulder
+
 
 def get_coordinate(coord):
     feat_type = coord[0]
@@ -475,13 +568,17 @@ def gc_content(gb_record, fig_horizontal_length,
 
 
 def normalize_position_to_track(
-        position, genome_length, fig_horizontal_length, genome_size_normalization_factor):
-    normalized_position = fig_horizontal_length *         (position / genome_length) * genome_size_normalization_factor
+        position,
+        genome_length,
+        fig_horizontal_length,
+        genome_size_normalization_factor):
+    normalized_position = fig_horizontal_length * \
+        (position / genome_length) * genome_size_normalization_factor
     return normalized_position
 
 
 def compute_strand(strandedness, strand):
-    if strandedness == True:
+    if strandedness:
         offset = 0.1
         height = 0.45
         factors_positive = [-(height + offset), -
@@ -499,8 +596,13 @@ def compute_strand(strandedness, strand):
     return factors
 
 
-def create_intron_path_linear(cds_height, coord_dict, genome_length,
-                              fig_horizontal_length, genome_size_normalization_factor, strandedness):
+def create_intron_path_linear(
+        cds_height,
+        coord_dict,
+        genome_length,
+        fig_horizontal_length,
+        genome_size_normalization_factor,
+        strandedness):
     coord_path = []
     coord_path.append("intron")
     feat_start = coord_dict['feat_start']
@@ -521,7 +623,8 @@ def create_intron_path_linear(cds_height, coord_dict, genome_length,
     start_y = cds_height * factors[1]
     end_x = normalized_end
     end_y = cds_height * factors[1]
-    feature_path = "M " + str(start_x) + "," + str(start_y) +         "L" + str(end_x) + "," + str(end_y) + " z"
+    feature_path = "M " + str(start_x) + "," + str(start_y) + \
+        "L" + str(end_x) + "," + str(end_y) + " z"
     coord_path.append(feature_path)
     return coord_path
 
@@ -535,7 +638,14 @@ def set_arrow_shoulder_linear(
     return shoulder
 
 
-def create_arrowhead_path_linear(coord_dict, genome_length, cds_height, fig_horizontal_length, cds_arrow_length, genome_size_normalization_factor, strandedness):
+def create_arrowhead_path_linear(
+        coord_dict,
+        genome_length,
+        cds_height,
+        fig_horizontal_length,
+        cds_arrow_length,
+        genome_size_normalization_factor,
+        strandedness):
     coord_path = []
     coord_path.append("exon")
     feat_start = int(coord_dict["feat_start"])
@@ -553,7 +663,8 @@ def create_arrowhead_path_linear(coord_dict, genome_length, cds_height, fig_hori
         fig_horizontal_length,
         genome_size_normalization_factor)
     normalized_feat_len = normalized_end - normalized_start
-    normalized_arrow_length = fig_horizontal_length *         (cds_arrow_length / genome_length) * genome_size_normalization_factor
+    normalized_arrow_length = fig_horizontal_length * \
+        (cds_arrow_length / genome_length) * genome_size_normalization_factor
     arrow_strand_dict = {
         "positive": [
             normalized_start,
@@ -590,15 +701,23 @@ def create_arrowhead_path_linear(coord_dict, genome_length, cds_height, fig_hori
     return coord_path
 
 
-def create_rectangle_path_linear(coord_dict, genome_length, cds_height, fig_horizontal_length, genome_size_normalization_factor, strandedness):
+def create_rectangle_path_linear(
+        coord_dict,
+        genome_length,
+        cds_height,
+        fig_horizontal_length,
+        genome_size_normalization_factor,
+        strandedness):
     coord_path = []
     coord_path.append("exon")
     feat_start = coord_dict['feat_start']
     feat_end = coord_dict['feat_end']
     feat_strand = coord_dict["feat_strand"]
     factors = compute_strand(strandedness, feat_strand)
-    normalized_start = fig_horizontal_length *         (coord_dict['feat_start'] / genome_length) *         genome_size_normalization_factor
-    normalized_end = fig_horizontal_length *         (coord_dict['feat_end'] / genome_length) *         genome_size_normalization_factor
+    normalized_start = fig_horizontal_length * \
+        (coord_dict['feat_start'] / genome_length) * genome_size_normalization_factor
+    normalized_end = fig_horizontal_length * \
+        (coord_dict['feat_end'] / genome_length) * genome_size_normalization_factor
     start_x_1 = normalized_start
     start_y_1 = cds_height * factors[0]
     start_x_2 = normalized_start
@@ -612,8 +731,16 @@ def create_rectangle_path_linear(coord_dict, genome_length, cds_height, fig_hori
     coord_path.append(feature_path)
     return coord_path
 
-def create_canvas(file_name, width, canvas_padding, num_of_entries,
-                  cds_height, comparison_height, vertical_padding, vertical_offset):
+
+def create_canvas(
+        file_name,
+        width,
+        canvas_padding,
+        num_of_entries,
+        cds_height,
+        comparison_height,
+        vertical_padding,
+        vertical_offset):
     total_width = str(width + 2 * canvas_padding)
     total_height = str(2 *
                        vertical_offset +
@@ -627,21 +754,52 @@ def create_canvas(file_name, width, canvas_padding, num_of_entries,
                         vertical_padding) *
                        (num_of_entries -
                            1))
-    dwg = svgwrite.Drawing(filename=file_name + ".svg", size=(total_width + 'px', total_height + 'px'),
-                           viewBox=('0 0 ' + str(total_width) + ' ' + str(total_height)))
+    dwg = svgwrite.Drawing(
+        filename=file_name +
+        ".svg",
+        size=(
+            total_width +
+            'px',
+            total_height +
+            'px'),
+        viewBox=(
+            '0 0 ' +
+            str(total_width) +
+            ' ' +
+            str(total_height)))
     return dwg
 
-def axis_path_linear(genome_length, fig_horizontal_length, genome_size_normalization_factor):
+
+def axis_path_linear(
+        genome_length,
+        fig_horizontal_length,
+        genome_size_normalization_factor):
     bar_length = fig_horizontal_length * genome_size_normalization_factor
     start_x = 0
-    start_y =  0
+    start_y = 0
     end_x = bar_length
     end_y = 0
-    axis_path = Line(start=(start_x, start_y), end=(end_x, end_y), stroke='lightgray',stroke_width=2, fill='none')
+    axis_path = Line(
+        start=(
+            start_x,
+            start_y),
+        end=(
+            end_x,
+            end_y),
+        stroke='lightgray',
+        stroke_width=2,
+        fill='none')
     return axis_path
 
-def gene_to_path_linear(gene_object, genome_length: int, cds_height: int,
-                        fig_horizontal_length: int, genome_size_normalization_factor, strandedness, cds_arrow_length):
+
+def gene_to_path_linear(
+        gene_object,
+        genome_length: int,
+        cds_height: int,
+        fig_horizontal_length: int,
+        genome_size_normalization_factor,
+        strandedness,
+        cds_arrow_length):
     coords = gene_object.location
     gene_body_color = gene_object.color
     coordinates_paths = []
@@ -662,7 +820,7 @@ def gene_to_path_linear(gene_object, genome_length: int, cds_height: int,
                 genome_size_normalization_factor,
                 strandedness)
         elif feat_type == "exon":
-            if coord[5] == True:
+            if coord[5]:
                 coord_path = create_arrowhead_path_linear(
                     coord_dict,
                     genome_length,
@@ -684,11 +842,23 @@ def gene_to_path_linear(gene_object, genome_length: int, cds_height: int,
         coordinates_paths.append(coord_path)
     return coordinates_paths
 
-def draw_paths_linear(feature_dict, cds_height, genome_length, group: Group, fig_horizontal_length: int,
-                      fig_vertical_length: int, genome_size_normalization_factor, strandedness, cds_arrow_length) -> svgwrite.container.Group:
+
+def draw_paths_linear(
+        feature_dict,
+        cds_height,
+        genome_length,
+        group: Group,
+        fig_horizontal_length: int,
+        fig_vertical_length: int,
+        genome_size_normalization_factor,
+        strandedness,
+        cds_arrow_length) -> svgwrite.container.Group:
     total_len = genome_length
     record_group = Group(id="record")
-    axis_path = axis_path_linear(genome_length, fig_horizontal_length, genome_size_normalization_factor)
+    axis_path = axis_path_linear(
+        genome_length,
+        fig_horizontal_length,
+        genome_size_normalization_factor)
     group.add(axis_path)
     for key in feature_dict:
         feature_object = feature_dict[key]
@@ -766,16 +936,25 @@ def draw_paths_linear(feature_dict, cds_height, genome_length, group: Group, fig
                 group.add(feature_path)
     return group
 
-def normalize(position,longest_genome,fig_horizontal_length): 
+
+def normalize(position, longest_genome, fig_horizontal_length):
     return fig_horizontal_length * (position / longest_genome)
 
-def add_match_path(row, mutual_hit_group, longest_genome, fig_horizontal_length, comparison_height, record_dict, align_center):
+
+def add_match_path(
+        row,
+        mutual_hit_group,
+        longest_genome,
+        fig_horizontal_length,
+        comparison_height,
+        record_dict,
+        align_center):
     query_id = row.query
     subject_id = row.subject
     if align_center:
-        query_offset_x = (longest_genome-record_dict[query_id])/2
-        subject_offset_x = (longest_genome-record_dict[subject_id])/2
-    else: 
+        query_offset_x = (longest_genome - record_dict[query_id]) / 2
+        subject_offset_x = (longest_genome - record_dict[subject_id]) / 2
+    else:
         query_offset_x = 0
         subject_offset_x = 0
     query_start = row.qstart + query_offset_x
@@ -783,13 +962,22 @@ def add_match_path(row, mutual_hit_group, longest_genome, fig_horizontal_length,
     subject_start = row.sstart + subject_offset_x
     subject_end = row.send + subject_offset_x
     percent_ident = row.identity
-    query_start_x = normalize(query_start,longest_genome,fig_horizontal_length)
+    query_start_x = normalize(
+        query_start,
+        longest_genome,
+        fig_horizontal_length)
     query_start_y = 0
     query_end_x = normalize(query_end, longest_genome, fig_horizontal_length)
     query_end_y = 0
-    subject_start_x = normalize(subject_start,longest_genome,fig_horizontal_length)
+    subject_start_x = normalize(
+        subject_start,
+        longest_genome,
+        fig_horizontal_length)
     subject_start_y = comparison_height
-    subject_end_x = normalize(subject_end,longest_genome,fig_horizontal_length)
+    subject_end_x = normalize(
+        subject_end,
+        longest_genome,
+        fig_horizontal_length)
     subject_end_y = comparison_height
     '''
     if percent_ident < 60:
@@ -803,7 +991,7 @@ def add_match_path(row, mutual_hit_group, longest_genome, fig_horizontal_length,
     elif 90 <= percent_ident <= 100:
         opacity = 0.6
     '''
-    opacity=0.7
+    opacity = 0.7
     feature_path_desc = "M " + str(query_start_x) + "," + str(query_start_y) + "L" + str(query_end_x) + "," + str(
         query_end_y) + " L" + str(subject_end_x) + "," + str(subject_end_y) + "L" + str(subject_start_x) + "," + str(subject_start_y) + " z"
     feature_path = Path(
@@ -813,8 +1001,9 @@ def add_match_path(row, mutual_hit_group, longest_genome, fig_horizontal_length,
         stroke='none',
         stroke_width=0.2)
     mutual_hit_group.add(feature_path)
-    #fill='#ff99ff'
+    # fill='#ff99ff'
     return mutual_hit_group
+
 
 def length_bar_to_track(fig_width: int, cds_height: int, longest_genome: int):
     if longest_genome < 2000:
@@ -838,7 +1027,7 @@ def length_bar_to_track(fig_width: int, cds_height: int, longest_genome: int):
     elif 1000000 <= longest_genome < 2000000:
         tick = 200000
         label_text = str(int(tick / 1000)) + " kbp"
-    elif 2000000 <= longest_genome :
+    elif 2000000 <= longest_genome:
         tick = 500000
         label_text = str(int(tick / 1000)) + " kbp"
     record_group = Group(id="length_bar")
@@ -875,15 +1064,15 @@ def length_bar_to_track(fig_width: int, cds_height: int, longest_genome: int):
 
 
 def record_to_track(record, fig_width, cds_height,
-                    longest_genome, strandedness):
+                    longest_genome, strandedness, color_table):
     track_id = str(record.annotations["accessions"][0])
     record_group = Group(id=track_id)
     record_name = record.annotations["source"]
     recod_length = len(record.seq)
     genome_size_normalization_factor = recod_length / longest_genome
-    cds_arrow_length = 0.0012 * longest_genome 
+    cds_arrow_length = 0.0012 * longest_genome
     track_height = cds_height
-    feature_dict = create_feature_dict(record)
+    feature_dict = create_feature_dict(record, color_table)
     record_group = draw_paths_linear(
         feature_dict,
         cds_height,
@@ -959,7 +1148,21 @@ def record_definition_to_track(record):
     record_group.add(num_cds_path)
     return record_group
 
-def add_records_on_canvas(canvas, records, longest_genome, cds_height, alignment_width, horizontal_offset, vertical_padding, comparison_height, strandedness, vertical_offset, show_gc, align_center):
+
+def add_records_on_canvas(
+        canvas,
+        records,
+        longest_genome,
+        cds_height,
+        alignment_width,
+        horizontal_offset,
+        vertical_padding,
+        comparison_height,
+        strandedness,
+        vertical_offset,
+        show_gc,
+        align_center,
+        color_table):
     count = 0
     for record in records:
         count += 1
@@ -969,10 +1172,12 @@ def add_records_on_canvas(canvas, records, longest_genome, cds_height, alignment
             alignment_width,
             cds_height,
             longest_genome,
-            strandedness)
-        offset = vertical_offset + (cds_height + comparison_height + 2 * vertical_padding) * (count - 1)
+            strandedness, color_table)
+        offset = vertical_offset + \
+            (cds_height + comparison_height + 2 * vertical_padding) * (count - 1)
         if align_center:
-            offset_x = alignment_width * ((longest_genome - len(record.seq))/longest_genome) / 2
+            offset_x = alignment_width * \
+                ((longest_genome - len(record.seq)) / longest_genome) / 2
         else:
             offset_x = 0
         record_group.translate(offset_x + horizontal_offset, offset)
@@ -985,22 +1190,50 @@ def add_records_on_canvas(canvas, records, longest_genome, cds_height, alignment
                 gc_height = 2 * cds_height
             gc_content_group = gc_content(
                 record, alignment_width, longest_genome, df, gc_height)
-            gc_content_group.translate(offset_x + horizontal_offset, offset + gc_height)
+            gc_content_group.translate(
+                offset_x + horizontal_offset,
+                offset + gc_height)
             canvas.add(gc_content_group)
-        record_definition_group.translate(offset_x + horizontal_offset * 0.5, offset)
+        record_definition_group.translate(
+            offset_x + horizontal_offset * 0.5, offset)
         canvas.add(record_definition_group)
     return canvas
 
-def comparison_to_track(comparison_df, comparison_count,
-                        longest_genome, alignment_width, comparison_height, record_dict, align_center):
+
+def comparison_to_track(
+        comparison_df,
+        comparison_count,
+        longest_genome,
+        alignment_width,
+        comparison_height,
+        record_dict,
+        align_center):
     track_id = "comparison" + str(comparison_count)
     comparison_group = Group(id=track_id)
     for row in comparison_df.itertuples():
-        comparison_group = add_match_path(row,comparison_group,longest_genome,alignment_width,comparison_height, record_dict, align_center)
+        comparison_group = add_match_path(
+            row,
+            comparison_group,
+            longest_genome,
+            alignment_width,
+            comparison_height,
+            record_dict,
+            align_center)
     return comparison_group
 
 
-def add_comparison_on_canvas(canvas, comparisons, longest_genome, cds_height, alignment_width,horizontal_offset, vertical_padding, comparison_height, vertical_offset, record_dict, align_center):
+def add_comparison_on_canvas(
+        canvas,
+        comparisons,
+        longest_genome,
+        cds_height,
+        alignment_width,
+        horizontal_offset,
+        vertical_padding,
+        comparison_height,
+        vertical_offset,
+        record_dict,
+        align_center):
     comparison_count = 0
     for comparison in comparisons:
         comparison_count += 1
@@ -1016,10 +1249,20 @@ def add_comparison_on_canvas(canvas, comparisons, longest_genome, cds_height, al
         canvas.add(comparison_group)
     return canvas
 
+
 def main():
     args = _get_args()
     comps = []
     genbank_files = args.input
+    color_table = args.table
+    color_table = pd.read_csv(
+        color_table,
+        sep='\t',
+        names=(
+            'feature_type',
+            'qualifier_key',
+            'value',
+            'color'))
     blast_files = args.blast
     records = load_gbks(genbank_files)
     out_file_prefix = args.output
@@ -1072,7 +1315,7 @@ def main():
         comparison_height,
         strandedness,
         vertical_offset,
-        show_gc, align_center)
+        show_gc, align_center, color_table)
     if blast_files is not None:
         comparisons = load_comparisons(blast_files, evalue, bitscore, identity)
         canvas = add_comparison_on_canvas(
@@ -1089,7 +1332,8 @@ def main():
         add_margin = 2 * cds_height
     else:
         add_margin = 0
-    length_bar_group = length_bar_to_track(alignment_width, cds_height, longest_genome)
+    length_bar_group = length_bar_to_track(
+        alignment_width, cds_height, longest_genome)
     offset_for_length_bar = (add_margin +
                              vertical_offset +
                              2 *
@@ -1106,6 +1350,6 @@ def main():
     canvas.filename = "{}.svg".format(out_file_prefix)
     canvas.save()
 
+
 if __name__ == "__main__":
     main()
-
