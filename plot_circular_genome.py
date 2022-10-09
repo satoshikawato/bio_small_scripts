@@ -366,7 +366,10 @@ def get_color(feature, color_table):
 
 def create_gene_object(feature_id, feature, color_table):
     exon_coordinates = feature.location.parts
-    note = list(feature.qualifiers['note'])
+    if 'note' in feature.qualifiers.keys():
+        note = feature.qualifiers['note'][0]
+    else:
+        note = "none"
     product = feature.qualifiers['product'][0]
     gene_biotype = get_gene_biotype(feature)
     color = get_color(feature, color_table)
@@ -391,7 +394,10 @@ def create_repeat_object(repeat_id, feature):
             rpt_family = "undefined"
         color = "#d3d3d3"
         rpt_type = feature.qualifiers['rpt_type'][0]
-        note = list(feature.qualifiers['note'])
+        if 'note' in feature.qualifiers.keys():
+            note = feature.qualifiers['note'][0]
+        else:
+            note = "none"
         location = get_exon_and_intron_coordinates(coordinates)
         repeat_object = RepeatObject(
             repeat_id, location, rpt_family, color, rpt_type, note)
@@ -406,7 +412,7 @@ def create_feature_object(feature_id, feature):
         if 'note' in feature.qualifiers.keys():
             note = feature.qualifiers['note'][0]
         else:
-            note = "undefined"
+            note = "none"
         color = "#d3d3d3"
         location = get_exon_and_intron_coordinates(coordinates)
         note = list(feature.qualifiers['note'])
@@ -835,7 +841,7 @@ def record_circular(gb_record, radius, track_ratio, color_table):
                     exon_path = Path(
                         d=cds_path[1],
                         fill=feature_object.color,
-                        stroke='black',
+                        stroke='none',
                         stroke_width=0.5)
                     record_group.add(exon_path)
                 elif feat_type == "intron":
@@ -862,7 +868,7 @@ def record_circular(gb_record, radius, track_ratio, color_table):
                 unit_path = Path(
                     d=repeat_path[1],
                     fill=color,
-                    stroke='black',
+                    stroke='none',
                     stroke_width=0.5)
                 record_group.add(unit_path)
         elif isinstance(feature_object, FeatureObject):
@@ -882,7 +888,7 @@ def record_circular(gb_record, radius, track_ratio, color_table):
                 feature_path = Path(
                     d=feature_path[1],
                     fill=color,
-                    stroke='black',
+                    stroke='none',
                     stroke_width=0.5)
                 record_group.add(feature_path)
     return record_group
