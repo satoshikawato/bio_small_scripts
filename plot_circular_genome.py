@@ -349,15 +349,18 @@ def get_color(feature, color_table):
         color = "#e69f00"
     else:
         color = "gray"
-
-    # Apply feature-specific color
-    if color_table == "":
-        pass
+    if 'note' in feature.qualifiers.keys():
+        note = feature.qualifiers['note'][0]
     else:
+        note = "none"
+    # Apply feature-specific color
+    if isinstance(color_table, pd.DataFrame):
         target_row = color_table[(color_table['feature_type'] == feature.type) & (color_table['qualifier_key'] == "note") & (
-            color_table['value'].isin(feature.qualifiers['note'])) & (color_table['color'].notna())]
+            color_table['value'].str.contains(note,case=False,na=False, regex=False)) & (color_table['color'].notna())]
         if (len(target_row) == 1):
             color = target_row['color'].tolist()[0]
+    else:
+        pass
     return color
 
 
@@ -832,7 +835,7 @@ def record_circular(gb_record, radius, track_ratio, color_table):
                     exon_path = Path(
                         d=cds_path[1],
                         fill=feature_object.color,
-                        stroke='none',
+                        stroke='black',
                         stroke_width=0.5)
                     record_group.add(exon_path)
                 elif feat_type == "intron":
@@ -859,7 +862,7 @@ def record_circular(gb_record, radius, track_ratio, color_table):
                 unit_path = Path(
                     d=repeat_path[1],
                     fill=color,
-                    stroke='none',
+                    stroke='black',
                     stroke_width=0.5)
                 record_group.add(unit_path)
         elif isinstance(feature_object, FeatureObject):
