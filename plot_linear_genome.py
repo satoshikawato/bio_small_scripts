@@ -54,13 +54,14 @@ def _get_args():
         '-t',
         '--table',
         help='color table (optional)',
-        type=str)
+        type=str,
+        default="")
     parser.add_argument(
         '-o',
         '--output',
         help='output prefix (default: diagram)',
         type=str,
-        default="diagram")
+        default="out")
     parser.add_argument(
         '-n',
         '--nt',
@@ -304,10 +305,13 @@ def get_color(feature, color_table):
     else:
         note = "none"
     # Apply feature-specific color
-    target_row = color_table[(color_table['feature_type'] == feature.type) & (color_table['qualifier_key'] == "note") & (
-        color_table['value'].str.contains(note)) & (color_table['color'].notna())]
-    if (len(target_row) == 1):
-        color = target_row['color'].tolist()[0]
+    if isinstance(color_table, pd.DataFrame):
+        target_row = color_table[(color_table['feature_type'] == feature.type) & (color_table['qualifier_key'] == "note") & (
+            color_table['value'].str.contains(note,case=False,na=False, regex=False)) & (color_table['color'].notna())]
+        if (len(target_row) == 1):
+            color = target_row['color'].tolist()[0]
+    else:
+        pass
     return color
 
 
@@ -1254,34 +1258,34 @@ def main():
     args = _get_args()
     comps = []
     genbank_files = args.input
-    color_table = args.table
-    color_table = pd.read_csv(
-        color_table,
-        sep='\t',
-        names=(
-            'feature_type',
-            'qualifier_key',
-            'value',
-            'color'))
-    blast_files = args.blast
-    records = load_gbks(genbank_files)
     out_file_prefix = args.output
-    fig_width = 2000
+    blast_files = args.blast
+    color_table = args.table
     strandedness = args.separate_strands
     show_gc = args.show_gc
     align_center = args.align_center
     evalue = args.evalue
     bitscore = args.bitscore
     identity = args.identity
+    
+    column_names = ['feature_type','qualifier_key','value','color']
+    if color_table == "":
+        pass
+    else:
+        color_table = pd.read_csv(color_table,sep='\t',names=(column_names))
+    
+    records = load_gbks(genbank_files)
+    
+    fig_width = 2000
+
     if strandedness:
         canvas_padding = 20
         cds_height = 20
-        comparison_height = 50
+        comparison_height = 100
     else:
         canvas_padding = 20
         cds_height = 10
-        comparison_height = 50
-    comparison_height = 75
+        comparison_height = 100
     vertical_padding = 5
     record_dict = {}
     for record in records:
