@@ -59,7 +59,8 @@ def _get_args():
         '-t',
         '--table',
         help='color table (optional)',
-        type=str)
+        type=str,
+        default="")
     parser.add_argument(
         '-n',
         '--nt',
@@ -350,10 +351,13 @@ def get_color(feature, color_table):
         color = "gray"
 
     # Apply feature-specific color
-    target_row = color_table[(color_table['feature_type'] == feature.type) & (color_table['qualifier_key'] == "note") & (
-        color_table['value'].isin(feature.qualifiers['note'])) & (color_table['color'].notna())]
-    if (len(target_row) == 1):
-        color = target_row['color'].tolist()[0]
+    if color_table == "":
+        pass
+    else:
+        target_row = color_table[(color_table['feature_type'] == feature.type) & (color_table['qualifier_key'] == "note") & (
+            color_table['value'].isin(feature.qualifiers['note'])) & (color_table['color'].notna())]
+        if (len(target_row) == 1):
+            color = target_row['color'].tolist()[0]
     return color
 
 
@@ -951,7 +955,6 @@ def create_canvas(file_name, total_width, total_height):
 def plot_genome_diagram(gb_record, window, step, dinucleotide, color_table):
     record_name = gb_record.annotations["source"]
     accession = str(gb_record.annotations["accessions"][0])
-    color_table = color_table[color_table['locus'] == accession]
     total_width = 1000
     total_height = 1000
     radius = 300
@@ -992,15 +995,11 @@ def main():
     window = args.window
     step = args.step
     color_table = args.table
-    color_table = pd.read_csv(
-        color_table,
-        sep='\t',
-        names=(
-            'locus',
-            'feature_type',
-            'qualifier_key',
-            'value',
-            'color'))
+    column_names = ['feature_type','qualifier_key','value','color']
+    if color_table == "":
+        pass
+    else:
+        color_table = pd.read_csv(color_table,sep='\t',names=(column_names))
     gb_records = SeqIO.parse(input_file, 'genbank')
     for gb_record in gb_records:
         plot_genome_diagram(gb_record, window, step, dinucleotide, color_table)
