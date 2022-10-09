@@ -94,15 +94,16 @@ optional arguments:
 Generate genome diagram in SVG
 ```
 $ ./plot_circular_genome.py -h
-usage: plot_circular_genome.py [-h] -i INPUT [-n NT] [-w WINDOW] [-s STEP]
+usage: plot_circular_genome.py [-h] -i INPUT [-t TABLE] [-n NT] [-w WINDOW] [-s STEP]
 
 Generate genome diagram in SVG.
 
 optional arguments:
-
   -h, --help            show this help message and exit
   -i INPUT, --input INPUT
                         Genbank/DDBJ flatfile (required)
+  -t TABLE, --table TABLE
+                        color table (optional)
   -n NT, --nt NT        dinucleotide (default: GC).
   -w WINDOW, --window WINDOW
                         window size (default: 1000)
