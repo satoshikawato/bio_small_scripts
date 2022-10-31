@@ -24,7 +24,7 @@ def _get_args():
         "--out",
         "--output",
         metavar="FILE",
-        help="output FASTA file",
+        help="output Genbank file",
         required=True)
     parser.add_argument(
         "-s",
