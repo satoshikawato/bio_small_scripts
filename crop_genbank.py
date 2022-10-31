@@ -49,7 +49,7 @@ def gbk_to_seqrecord(in_gbk):
     """Load the first instance of GenBank as SerRecord
     Args:
     """
-    records = SeqIO.parse(gbk_file, 'genbank')
+    records = SeqIO.parse(in_gbk, 'genbank')
     record = next(records)
     return record
 
