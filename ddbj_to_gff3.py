@@ -216,13 +216,17 @@ def main():
                 gene_object = feature_object
                 gene_biotype = gene_object.gene_biotype
                 product = gene_object.qualifiers['product'][0]
-                notes = gene_object.qualifiers['note']
+                if 'note' in gene_object.qualifiers.keys():
+                    notes = gene_object.qualifiers['note']
+                else:
+                    notes = ""
                 new_notes = ""
                 for note in notes:
                     if "source:" in note:
                         continue
                     else:
                         new_notes += "note={};".format(note)
+                        break
                 if gene_biotype == 'rRNA':
                     gene_qualifiers = "ID={};product={};gene_biotype={};".format(
                         locus_id, product, gene_biotype)
