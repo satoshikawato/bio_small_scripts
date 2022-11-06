@@ -33,7 +33,8 @@ optional arguments:
   --input FILE, --in FILE, -i FILE
                         input BLASTN/TBLASTX result file in XML format (-outfmt 5)
 ```
-![NC_000913 3_NC_004337_BLASTN](https://user-images.githubusercontent.com/58936715/180001866-5f67723e-114d-42c1-aa75-8660e9aedba6.png)
+![Query_1_Subject_1_BLASTN](https://user-images.githubusercontent.com/58936715/200174764-310d8112-2e50-42b6-9e31-b030a48648c2.svg)
+
 
 ## depth_alignment_breakpoint.py
 
