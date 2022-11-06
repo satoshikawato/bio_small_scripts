@@ -300,14 +300,19 @@ def get_color(feature, color_table):
         color = "#e69f00"
     else:
         color = "gray"
+    qualifers_list = []
+    if 'product' in feature.qualifiers.keys():
+        product = feature.qualifiers['product'][0]
+    else:
+        prodcut = "none"
     if 'note' in feature.qualifiers.keys():
         note = feature.qualifiers['note'][0]
     else:
         note = "none"
     # Apply feature-specific color
     if isinstance(color_table, pd.DataFrame):
-        target_row = color_table[(color_table['feature_type'] == feature.type) & (color_table['qualifier_key'] == "note") & (
-            color_table['value'].str.contains(note,case=False,na=False, regex=False)) & (color_table['color'].notna())]
+        target_row = color_table[(color_table['feature_type'] == feature.type)  & (color_table['color'].notna())& ((
+            color_table['value'].str.contains(product,case=False,na=False, regex=False) |color_table['value'].str.contains(note,case=False,na=False, regex=False)))]
         if (len(target_row) == 1):
             color = target_row['color'].tolist()[0]
     else:
@@ -321,7 +326,10 @@ def create_gene_object(feature_id, feature, color_table):
         note = feature.qualifiers['note'][0]
     else:
         note = ""
-    product = feature.qualifiers['product'][0]
+    if 'product' in feature.qualifiers.keys():
+        product = feature.qualifiers['product'][0]
+    else:
+        product = ""
     gene_biotype = get_gene_biotype(feature)
     color = get_color(feature, color_table)
     exon_list = get_exon_and_intron_coordinates(exon_coordinates)
@@ -370,7 +378,7 @@ def create_feature_object(feature_id, feature):
         color = "#d3d3d3"
         location = get_exon_and_intron_coordinates(coordinates)
 
-        feature_object = FeatureObject(feature_id, location, note, color, note)
+        feature_object = FeatureObject(feature_id, location, color, note)
     else:
         raise ValueError("feature not misc_feature")
     return feature_object
@@ -399,14 +407,6 @@ def create_feature_dict(gb_record, color_table):
             feature_object = create_feature_object(feature_id, feature)
             feature_dict[feature_id] = feature_object
     return feature_dict
-
-
-def get_product_color(notes):
-    """
-    Not implemented yet.
-    """
-    product_color = "lightgray"
-    return product_color
 
 
 def get_strand(strand_value: int) -> str:
@@ -1281,11 +1281,11 @@ def main():
     if strandedness:
         canvas_padding = 20
         cds_height = 20
-        comparison_height = 100
+        comparison_height = 50
     else:
         canvas_padding = 20
         cds_height = 10
-        comparison_height = 100
+        comparison_height = 50
     vertical_padding = 5
     record_dict = {}
     for record in records:
