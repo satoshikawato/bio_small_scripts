@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# Basically rewrite of this:
+# Insprired and cannibalized from:
 # Biopython Tutorial and Cookbook 20.1.13 Identifying open reading frames
 # http://biopython.org/DIST/docs/tutorial/Tutorial.html#sec384
 # Motivations:
