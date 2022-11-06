@@ -64,7 +64,7 @@ def draw_hits(df, query_len, subject_len, total_width, total_height, max_len):
                 send),
             stroke=color,
             stroke_opacity=opacity,
-            stroke_width=1,
+            stroke_width=2,
             fill='none')
         hit_group.add(hit)
     return hit_group
