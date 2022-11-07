@@ -12,8 +12,6 @@ from svgwrite.shapes import Line
 from svgwrite.path import Path
 from svgwrite.text import Text
 from Bio.Blast import NCBIXML
-
-
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 
@@ -27,6 +25,13 @@ def _get_args():
         metavar="FILE",
         help="input BLASTN/TBLASTX result file in XML format (-outfmt 5)",
         required=True)
+    parser.add_argument(
+        "--output",
+        "--out",
+        "-o",
+        metavar="str",
+        help="output SVG file (default: out.svg)",
+        default="out.svg")
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
@@ -259,8 +264,18 @@ def create_frame(total_width, total_height):
 
 
 def create_canvas(file_name, total_width, total_height):
-    dwg = svgwrite.Drawing(filename=file_name + ".svg", size=(str(total_width) + 'px', str(total_height) + 'px'),
-                           viewBox=('0 0 ' + str(total_width) + ' ' + str(total_height)))
+    dwg = svgwrite.Drawing(
+        filename=file_name,
+        size=(
+            str(total_width) +
+            'px',
+            str(total_height) +
+            'px'),
+        viewBox=(
+            '0 0 ' +
+            str(total_width) +
+            ' ' +
+            str(total_height)))
     return dwg
 
 
@@ -314,6 +329,7 @@ def main():
     figsize = 1000
     args = _get_args()
     in_file = args.input
+    out_file = args.output
     supported = ["BLASTN", "TBLASTX"]
     with open(in_file, 'rt') as infile:
         blast_records = NCBIXML.parse(infile)
@@ -322,7 +338,7 @@ def main():
         for blast_record in blast_records:
             application = blast_record.application
             if application in supported:
-                msg = ("{} result detectted".format(application))
+                msg = ("{} result detected".format(application))
                 logging.info(msg)
             else:
                 raise TypeError(
@@ -342,9 +358,9 @@ def main():
                 subject_len = alignment.length
                 msg = (
                     "Subject:\n    ID: {}\n    Title: {}\n    Length: {}".format(
-                        query_id, query_title, query_len))
+                        subject_id, subject_title, subject_len))
                 logging.info(msg)
-                filename = "{}_{}_{}".format(query_id, subject_id, application)
+                filename = out_file
                 max_len = max(query_len, subject_len)
                 total_width = int(figsize * query_len / max_len)
                 total_height = int(figsize * subject_len / max_len)
@@ -407,7 +423,7 @@ def main():
                 frame_group = create_frame(total_width, total_height)
                 frame_group.translate(offset, offset)
                 canvas.add(frame_group)
-                canvas.filename = "{}.svg".format(filename)
+                canvas.filename = "{}".format(filename)
                 canvas.save()
                 msg = ("Dotplot saved as: {}".format(canvas.filename))
                 logging.info(msg)
