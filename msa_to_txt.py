@@ -195,7 +195,7 @@ def define_preceding_residues(
     return aln_out, preceding_residues
 
 
-def print_records(records, start, end, wrap, aln_before_dict):
+def print_records(records, start, end, wrap, preceding_residues):
     count = 0
     residues = get_residues(records)
 
@@ -206,8 +206,8 @@ def print_records(records, start, end, wrap, aln_before_dict):
     num_chunks = len(range(0, len(residues), wrap))
 
     chunk_seq_len = defaultdict(int)
-    for key in aln_before_dict.keys():
-        chunk_seq_len[key] = aln_before_dict[key]
+    for key in preceding_residues.keys():
+        chunk_seq_len[key] = preceding_residues[key]
     for chunk in range(0, num_chunks):
         residues = residues_chunks[chunk]
         residue_group = add_conservation(residues, start, end, wrap)
@@ -254,7 +254,7 @@ def main():
             with redirect_stdout(f):
                 print_records(aln_out, start, end, wrap, preceding_residues)
     else:
-        print_records(aln_out, start, end, wrap, aln_before_dict)
+        print_records(aln_out, start, end, wrap, preceding_residues)
 
 
 if __name__ == "__main__":
