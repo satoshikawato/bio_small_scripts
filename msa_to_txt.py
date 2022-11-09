@@ -138,15 +138,15 @@ def get_residues(records):
 
 def add_conservation(residues, start, end, wrap):
     residues = "".join(residues)
-    record_id = "".ljust(20, " ")
-    out_text = "{} {} {}{}".format(
+    record_id = "".ljust(15, " ")
+    out_text = "{} {} {} {}".format(
         record_id, " ".rjust(4), residues, " ".rjust(4))
     return out_text
 
 
 def make_text(record, start, end, wrap):
-    record_id = str(record.id)[:20].ljust(20, " ")
-    out_text = "{} {} {}{}".format(
+    record_id = str(record.id)[:15].ljust(15, " ")
+    out_text = "{} {} {} {}".format(
         record_id,
         str(start).rjust(4),
         record.seq,
