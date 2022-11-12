@@ -1,5 +1,5 @@
 # bio_small_scripts
-Miscellaneous scripts
+Small scripts to alleviate daily hassles in the dry lab
 
 ## gb2faa.py
 Extract protein sequences from a genbank file
