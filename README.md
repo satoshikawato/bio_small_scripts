@@ -3,6 +3,9 @@ Small scripts to alleviate daily hassles in the dry lab
 
 ## gb2faa.py
 Extract protein sequences from a genbank file
+### Requirements
+- [Biopython](https://biopython.org/)
+### Usage
 ```
 $ ./gb2faa.py
 usage: gb2faa.py [-h] -i INPUT [-o OUTPUT]
@@ -19,6 +22,8 @@ optional arguments:
 
 ## annotate_gff3.py
 Add functional annotation to the 9th column of a gff3 file
+### Requirements
+### Usage
 ```
 $ ./annotate_gff3.py -h
 usage: annotate_gff3.py [-h] -g GFF -b BLAST -f FUNC [-o OUT] [-p PREFIX]
@@ -38,6 +43,12 @@ optional arguments:
 ```
 
 ## blast2dotplot.py 
+Draw a dot plot based on a pairwise BLASTN/TBLASTX result
+### Requirements
+- [Biopython](https://biopython.org/)
+- [pandas](https://pandas.pydata.org/)
+- [SVGwrite](https://svgwrite.readthedocs.io/en/latest/)
+### Usage
 ```
 $ ./blast2dotplot.py
 usage: blast2dotplot.py [-h] --input FILE
@@ -55,6 +66,9 @@ optional arguments:
 ## depth_alignment_breakpoint.py
 
 ## ddbj_to_gff3.py
+### Requirements
+- [Biopython](https://biopython.org/)
+### Usage
 ```
 $ ./ddbj_to_gff3.py -h
 usage: ddbj_to_gff3.py [-h] -i INPUT [-o OUTPUT]
@@ -70,6 +84,9 @@ optional arguments:
 ```
 ## gb2nrfaa.py
 Extract the longest isoforms of protein-coding genes from a NCBI RefSeq euaryotic genome assembly
+### Requirements
+- [Biopython](https://biopython.org/)
+### Usage
 ```
 $ ./gb2nrfaa.py -h
 usage: gb2nrfaa.py [-h] -i INPUT [-o OUTPUT]
@@ -86,6 +103,9 @@ optional arguments:
 
 ## orfind.py
 ORF prediction allowing CDS overlaps and GFF3 output
+### Requirements
+- [Biopython](https://biopython.org/)
+### Usage
 ```
 $ ./orfind.py -h
 usage: orfind.py [-h] -i INPUT [-o OUT_GFF] [-a OUT_FAA] [-f OUT_FNA] [-g TRANS_TABLE] [-m MIN_AA_LEN]
@@ -109,6 +129,11 @@ optional arguments:
 ```
 ## plot_circular_genome.py
 Generate genome diagram in SVG
+### Requirements
+- [Biopython](https://biopython.org/)
+- [pandas](https://pandas.pydata.org/)
+- [SVGwrite](https://svgwrite.readthedocs.io/en/latest/)
+### Usage
 ```
 $ ./plot_circular_genome.py -h
 usage: plot_circular_genome.py [-h] -i INPUT [-t TABLE] [-n NT] [-w WINDOW] [-s STEP]
@@ -130,6 +155,11 @@ optional arguments:
 ![NZ_LR214945](https://user-images.githubusercontent.com/58936715/192824717-099c20e0-f976-431e-9881-f333ee10e597.svg)
 ## plot_skew.py
 Generate dinucleotide skew plot(s) of FASTA format DNA sequences in SVG format. Plots are saved separately for each entry in a multifasta file
+### Requirements
+- [Biopython](https://biopython.org/)
+- [pandas](https://pandas.pydata.org/)
+- [Matplotlib](https://matplotlib.org/)
+### Usage
 ```
 $ ./plot_skew.py
 usage: plot_skew.py [-h] -i INPUT [-n NT] [-w WINDOW] [-s STEP]
@@ -154,7 +184,9 @@ $ ./plot_skew.py NC_000913.3.fasta # (output: NC_000913.3.svg)
 
 
 ## msa_to_txt.py
-
+### Requirements
+- [Biopython](https://biopython.org/)
+### Usage
 ```sh
 $ ./msa_to_txt.py
 usage: aln_to_txt_wrap.py [-h] --input FILE [--output FILE] [-r REF] [-s START] [-e END] [-g GAP] [-w WRAP] [--gap_inclusive]
@@ -175,7 +207,6 @@ optional arguments:
   -w WRAP, --wrap WRAP  line width (default: 100)
   --gap_inclusive       Gap inclusive (default: False).
 ```
-
 ```sh
 $ less 16S.aligned.fasta
 
