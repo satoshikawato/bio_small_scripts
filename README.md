@@ -1,6 +1,22 @@
 # bio_small_scripts
 Miscellaneous scripts
 
+## gb2faa.py
+Extract protein sequences from a genbank file
+```
+$ ./gb2faa.py
+usage: gb2faa.py [-h] -i INPUT [-o OUTPUT]
+
+Extract protein sequences from a genbank file
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INPUT, --input INPUT
+                        GenBank flat file format of the genomic sequence(s) (required)
+  -o OUTPUT, --output OUTPUT
+                        output fasta file (default: out.faa)
+```
+
 ## annotate_gff3.py
 Add functional annotation to the 9th column of a gff3 file
 ```
