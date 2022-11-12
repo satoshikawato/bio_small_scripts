@@ -38,7 +38,7 @@ def _get_args():
         '-o',
         '--output',
         help=' output gff3 file (default:out.gff3)',
-        type=str)
+        type=str, default="out.gff3")
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
