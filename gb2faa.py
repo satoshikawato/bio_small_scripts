@@ -15,7 +15,7 @@ def _get_args():
     parser.add_argument(
         '-i',
         '--input',
-        help='GenBank file (required)',
+        help='GenBank flat file format of the genomic sequence(s) (required)',
         type=str,
         required=True)
     parser.add_argument(
@@ -39,10 +39,14 @@ def main():
     for record in records:
         for feature in record.features:
             if feature.type == 'CDS':
+                if 'protein_id' in feature.qualifiers.keys():
+                    record_id = feature.qualifiers['protein_id'][0]
+                else: 
+                    record_id = "{}_{}-{}".format(record.id,feature.location.start,feature.location.end)
                 out_record = SeqRecord(
-                    Seq(
+                Seq(
                         feature.qualifiers['translation'][0]),
-                    id=feature.qualifiers['protein_id'][0],
+                    id=record_id,
                     description="{} [{}]".format(
                         feature.qualifiers['product'][0],
                         record.annotations['organism']))
