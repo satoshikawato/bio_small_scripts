@@ -2,7 +2,7 @@
 Small scripts to alleviate daily hassles in the dry lab
 
 ## gb2faa.py
-Extract protein sequences from a genbank file
+Extract protein sequences from a genbank file downloaded from NCBI
 ### Requirements
 - [Biopython](https://biopython.org/)
 ### Usage
