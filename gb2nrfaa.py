@@ -33,7 +33,7 @@ def _gb_record_to_proteins(gb_record):
             product_name = feature.qualifiers['product'][0]
             aa_seq = Seq(feature.qualifiers['translation'][0])
             aa_record = SeqRecord(aa_seq, id=protein_id,
-                                  name=gene_id, description="{} [{}]".format(product_name, record.annotations['organism']))
+                                  name=gene_id, description="{} [{}]".format(product_name, gb_record.annotations['organism']))
             protein_records[gene_id].append(aa_record)
         else:
             continue
