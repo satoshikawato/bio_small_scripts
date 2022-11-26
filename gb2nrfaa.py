@@ -28,8 +28,11 @@ def _gb_record_to_proteins(gb_record):
     protein_records = defaultdict(list)
     for feature in gb_record.features:
         if feature.type == 'CDS':
+            if 'protein_id' in feature.qualifiers.keys():
+                protein_id = feature.qualifiers['protein_id'][0]
+            else:
+                continue
             gene_id = feature.qualifiers['gene'][0]
-            protein_id = feature.qualifiers['protein_id'][0]
             product_name = feature.qualifiers['product'][0]
             aa_seq = Seq(feature.qualifiers['translation'][0])
             aa_record = SeqRecord(aa_seq, id=protein_id,
