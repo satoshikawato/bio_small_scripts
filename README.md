@@ -164,6 +164,21 @@ optional arguments:
   --bitscore BITSCORE   bitscore threshold (default=50)
   --identity IDENTITY   identity threshold (default=0)
 ```
+Example:[lymphocystis disease virus](https://en.wikipedia.org/wiki/Lymphocystis)
+
+- [Lymphocystis disease virus 1, complete genome (NC_001824.1)](https://www.ncbi.nlm.nih.gov/nuccore/NC_001824.1)
+- [Lymphocystis disease virus Sa isolate SA9, complete genome (NC_033423.1)](https://www.ncbi.nlm.nih.gov/nuccore/NC_033423.1)
+- [Lymphocystis disease virus 2 LCDV-JP_Oita_2018 DNA, complete genome (LC534415.1)](https://www.ncbi.nlm.nih.gov/nuccore/LC534415.1)
+
+```sh
+$ tblastx -query NC_001824.fasta -subject NC_033423.fasta -outfmt 7 -out NC_001824_NC_033423.tblastx.out
+$ tblastx -query NC_033423.fasta -subject LC534415.fasta -outfmt 7 -out NC_033423_LC534415.tblastx.out
+```
+```sh
+./plot_linear_genome.py -i NC_001824.gb NC_033423.gb LC534415.gb -b NC_001824_NC_033423.tblastx.out NC_033423_LC534415.tblastx.out --separate_strands --align_center --evalue 1e-10 --bitscore 100 # output: out.svg
+```
+![out](https://user-images.githubusercontent.com/58936715/210162432-bb72385c-3942-4d83-bbd1-1b8ac9fca348.svg)
+
 
 ## plot_circular_genome.py
 Generate genome diagram in SVG
