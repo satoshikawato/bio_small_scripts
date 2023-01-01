@@ -292,8 +292,8 @@ def get_color(feature, color_table):
     # Set default color
     gene_biotype = get_gene_biotype(feature)
     if gene_biotype == "protein_coding":
-        # color = "#47b8f8"
-        color = "lightgray"
+        color = "#47b8f8"
+        #color = "lightgray"
     elif gene_biotype == "rRNA":
         color = "#009e73"
     elif gene_biotype == "tRNA":
@@ -882,7 +882,7 @@ def draw_paths_linear(
                         d=gene_path[1],
                         fill=gene_object.color,
                         stroke='black',
-                        stroke_width=0.5)
+                        stroke_width=0)
                     group.add(exon_path)
                 elif feat_type == "intron":
                     intron_path = Path(
@@ -1000,7 +1000,8 @@ def add_match_path(
         query_end_y) + " L" + str(subject_end_x) + "," + str(subject_end_y) + "L" + str(subject_start_x) + "," + str(subject_start_y) + " z"
     feature_path = Path(
         d=feature_path_desc,
-        fill='#92daff',
+        #fill='#92daff',
+        fill='lightgray',
         fill_opacity=opacity,
         stroke='none',
         stroke_width=0.2)
