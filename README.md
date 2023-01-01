@@ -127,6 +127,44 @@ optional arguments:
   -m MIN_AA_LEN, --min_aa_len MIN_AA_LEN
                         minimum protein length (default: 50)
 ```
+## plot_linear_genome.py
+Generate plot in SVG
+### Requirements
+- [Biopython](https://biopython.org/)
+- [pandas](https://pandas.pydata.org/)
+- [SVGwrite](https://svgwrite.readthedocs.io/en/latest/)
+### Usage
+```
+$ ./plot_linear_genome.py
+usage: plot_linear_genome.py [-h] -i [INPUT ...] [-b [BLAST ...]] [-t TABLE] [-o OUTPUT] [-n NT] [-w WINDOW] [-s STEP]
+                             [--separate_strands] [--show_gc] [--align_center] [--evalue EVALUE] [--bitscore BITSCORE]
+                             [--identity IDENTITY]
+
+Generate plot in SVG
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i [INPUT ...], --input [INPUT ...]
+                        genbank (required)
+  -b [BLAST ...], --blast [BLAST ...]
+                        input BLAST result file in tab-separated format (-outfmt 6 or 7) (optional)
+  -t TABLE, --table TABLE
+                        color table (optional)
+  -o OUTPUT, --output OUTPUT
+                        output prefix (default: diagram)
+  -n NT, --nt NT        dinucleotide (default: GC).
+  -w WINDOW, --window WINDOW
+                        window size (default: 1000)
+  -s STEP, --step STEP  step size (default: 100)
+  --separate_strands    separate forward and reverse strands (default: False). Features of undefined strands are shown
+                        on the forward strand.
+  --show_gc             plot GC content below genome (default: False).
+  --align_center        Align genomes to the center (default: False).
+  --evalue EVALUE       evalue threshold (default=1e-2)
+  --bitscore BITSCORE   bitscore threshold (default=50)
+  --identity IDENTITY   identity threshold (default=0)
+```
+
 ## plot_circular_genome.py
 Generate genome diagram in SVG
 ### Requirements
