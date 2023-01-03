@@ -12,7 +12,7 @@ from Bio.SeqRecord import SeqRecord
 from Bio.SeqFeature import SeqFeature
 
 def _get_args():
-    parser = argparse.ArgumentParser(description='Produce a simple TSV summary file for microbial genome assemblies')
+    parser = argparse.ArgumentParser(description='Crop genbank file. ')
     parser.add_argument('-i','--input',nargs='*', help='Genbank/DDBJ flatfile (required)',type=str,required=True)
     parser.add_argument("--output","-o", "--out","--output",metavar="FILE",help="output TSV file",default="out.tsv")
     args = parser.parse_args()
@@ -71,6 +71,7 @@ def get_assembly_stats(records):
     out_dict['strain'] = strain_name
     out_dict['Accession'] = assembly_name
     out_dict['Length'] = len(whole_seq)
+    out_dict['num_contigs'] = len(records)
     out_dict['GC%'] = calculate_gc_percent(whole_seq)
     out_dict['CDS'] = cds_count
     out_dict['rRNA'] = rrna_count
@@ -92,3 +93,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
