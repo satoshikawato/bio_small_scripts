@@ -12,7 +12,7 @@ from Bio.SeqRecord import SeqRecord
 from Bio.SeqFeature import SeqFeature
 
 def _get_args():
-    parser = argparse.ArgumentParser(description='Crop genbank file. ')
+    parser = argparse.ArgumentParser(description='Produce a simple TSV summary file for microbial genome assemblies')
     parser.add_argument('-i','--input',nargs='*', help='Genbank/DDBJ flatfile (required)',type=str,required=True)
     parser.add_argument("--output","-o", "--out","--output",metavar="FILE",help="output TSV file",default="out.tsv")
     args = parser.parse_args()
@@ -44,7 +44,12 @@ def get_assembly_stats(records):
     crispr_count = 0
     whole_seq = ''
     first_record = records[0]
-    assembly_name = dict(map(lambda s : s.split(':'), first_record.dbxrefs))['Assembly']
+    
+    dbxrefs_dict = dict(map(lambda s : s.split(':'), first_record.dbxrefs))
+    if 'Assembly' in dbxrefs_dict.keys():
+        assembly_name = dbxrefs_dict['Assembly']
+    else: 
+        assembly_name = first_record.id
     for feature in first_record.features:
         if feature.type == "source":
             if 'isolate' in feature.qualifiers.keys():
