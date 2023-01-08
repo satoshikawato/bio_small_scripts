@@ -41,8 +41,8 @@ def split_scaffolds(in_records, digit):
     for record in in_records:
         record_id = record.id
         contig_list = re.sub('[nN]+','\n',str(record.seq)).split('\n')
-        for i in range(1,len(contig_list)):
-            contig_id = "{}_{}".format(record_id, str(i).zfill(digit))
+        for i in range(0,len(contig_list)):
+            contig_id = "{}_{}".format(record_id, str(i+1).zfill(digit))
             out_records[contig_id] = contig_list[i]
     return out_records
 
