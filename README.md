@@ -62,7 +62,51 @@ optional arguments:
 ```
 ![Query_1_Subject_1_BLASTN](https://user-images.githubusercontent.com/58936715/200174764-310d8112-2e50-42b6-9e31-b030a48648c2.svg)
 
+## scaffold2contigs.py
+### Requirements
+- [Biopython](https://biopython.org/)
+### Usage
+```
+$ ./scaffold2contigs.py
+usage: scaffold2contigs.py [-h] --input INPUT [--output OUTPUT] [-d DIGIT]
 
+Split scaffolds into contigs
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --input INPUT, -i INPUT, --in INPUT
+                        Input FASTA file
+  --output OUTPUT, -o OUTPUT, --out OUTPUT
+                        output FASTA file (default: stdout)
+  -d DIGIT, --digit DIGIT
+                        number of digits for zero-padding (default:3)
+```
+```
+$ less in.fa
+>scaffold1
+ACTGTGCATNNNNNNACGCTGCANnnNNCTGCAnnnCTGCAnnNNNNCTGCA
+>scaffold2
+ACGACGACGCGATAGAGnnnnnnAGACGAGAGNNNnnACGACGACG
+```
+```
+$ ./scaffold2contigs.py -i in.fa
+>scaffold1_001
+ACTGTGCAT
+>scaffold1_002
+ACGCTGCA
+>scaffold1_003
+CTGCA
+>scaffold1_004
+CTGCA
+>scaffold1_005
+CTGCA
+>scaffold2_001
+ACGACGACGCGATAGAG
+>scaffold2_002
+AGACGAGAG
+>scaffold2_003
+ACGACGACG
+```
 ## depth_alignment_breakpoint.py
 
 ## ddbj_to_gff3.py
