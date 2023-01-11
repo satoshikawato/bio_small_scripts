@@ -1,5 +1,6 @@
 # bio_small_scripts
-Small scripts to alleviate daily hassles in the dry lab
+Small scripts to alleviate daily hassles in the dry lab.
+See [here](https://qiita.com/satoshi_kawato) (in Japanese) for the details and motivation behind each piece.
 
 ## gb2faa.py
 Extract protein sequences from a genbank file downloaded from NCBI
