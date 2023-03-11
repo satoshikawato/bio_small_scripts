@@ -416,7 +416,7 @@ def create_feature_object(feature_id, feature):
         color = "#d3d3d3"
         location = get_exon_and_intron_coordinates(coordinates)
         note = list(feature.qualifiers['note'])
-        feature_object = FeatureObject(feature_id, location, note, color, note)
+        feature_object = FeatureObject(feature_id, location, color, note)
     else:
         raise ValueError("feature not misc_feature")
     return feature_object
