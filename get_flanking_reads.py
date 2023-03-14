@@ -49,7 +49,7 @@ def calculate_read_coordinates(read, start, end, flank, prime):
         read_end = read.query_alignment_start + end 
         read_length = len(read.query_sequence[read_start:read_end])
     else:
-        read_start = read.query_alignment_end - window
+        read_start = read.query_alignment_end - end
         read_end = read.query_alignment_end + flank 
         read_length = len(read.query_sequence[read_start:read_end])
     return read_start, read_end, read_length
