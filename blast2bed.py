@@ -8,7 +8,7 @@ from contextlib import redirect_stdout
 
 def get_args():
     parser = argparse.ArgumentParser(
-        description='convert BLASTN/BLASTX/TBLASTX output into BED format')
+        description='convert BLASTN/TBLASTN/TBLASTX output into BED format')
     parser.add_argument(
         '-i',
         '--input',
