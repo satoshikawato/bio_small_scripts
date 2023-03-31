@@ -12,7 +12,7 @@ def get_args():
     parser.add_argument(
         '-i',
         '--input',
-        help='tab-separated blast output (required) with "-outfmt "[6|7]"',
+        help='tab-separated blast output (required) with "-outfmt [6|7]"',
         type=str,
         required=True)
     parser.add_argument(
