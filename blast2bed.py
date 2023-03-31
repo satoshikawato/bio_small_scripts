@@ -8,7 +8,7 @@ from contextlib import redirect_stdout
 
 def get_args():
     parser = argparse.ArgumentParser(
-        description='convert BLASTN/TBLASTN/TBLASTX output into BED format')
+        description='convert BLASTN/BLASTX/TBLASTX output into BED format')
     parser.add_argument(
         '-i',
         '--input',
@@ -44,18 +44,16 @@ def blast_to_bed(blast_out, score, evalue):
                 continue
             else:
                 line = line.split('\t')
+                start = line[6]
+                end = line[7]
                 if float(line[10]) > evalue:
                     continue
                 else:
-                    if (float(line[8]) > float(line[9])):
-                        start = str(int(line[9]) -1)
-                        end = str(int(line[8]))
+                    if (float(line[6]) > float(line[7])):
                         strand = "-"
                     else:
-                        start = str(int(line[8])-1)
-                        end = str(int(line[9]))
                         strand = "+"
-                    print("{}\t{}\t{}\t{}\t{}\t{}".format(line[1], start, end, strand, score, line[0]))
+                    print("{}\t{}\t{}\t{}\t{}\t{}".format(line[0], start, end, strand, score, line[1]))
 
 def main():
     args = get_args()
@@ -72,3 +70,4 @@ def main():
         
 if __name__ == "__main__":
     main()
+
