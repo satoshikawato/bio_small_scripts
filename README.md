@@ -169,6 +169,32 @@ optional arguments:
                         output fasta-formatted file (required)
 ```
 
+##get_flanking_reads.py
+Extract flanking reads from a BAM file
+## Requirements
+- [pysam](https://pysam.readthedocs.io/en/latest/)
+```
+$ ./get_flanking_reads.py
+usage: get_flanking_reads.py [-h] --input FILE [--output FILE] -r REF [-w WINDOW] [-m MIN] [-f FLANK] [-p PRIME] [-q]
+
+Extract flanking reads from a BAM file
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --input FILE, -i FILE, --in FILE
+                        Input BAM file
+  --output FILE, -o FILE, --out FILE, --output FILE
+                        output txt file
+  -r REF, --ref REF     reference entry name
+  -w WINDOW, --window WINDOW
+                        window (defalt:100)
+  -m MIN, --min MIN     minimum outut read lenth threshold (defalt:200)
+  -f FLANK, --flank FLANK
+                        flanking bases (defalt:100)
+  -p PRIME, --prime PRIME
+                        5'/3'-end
+  -q, --fastq           output fastq
+```
 ## orfind.py
 ORF prediction allowing CDS overlaps and GFF3 output
 ### Requirements
