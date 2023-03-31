@@ -2,6 +2,29 @@
 Small scripts to alleviate daily hassles in the dry lab.
 See [here](https://qiita.com/satoshi_kawato) (in Japanese) for the details and motivation behind each piece.
 
+## blast2bed.py
+convert BLASTN/BLASTX/TBLASTX output into BED format
+## Requirements
+- Python3
+
+```$ ./blast2bed.py
+usage: blast2bed.py [-h] -i INPUT [-o OUTPUT] [-s SCORE] [-e EVALUE]
+
+convert BLASTN/BLASTX/TBLASTX output into BED format
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INPUT, --input INPUT
+                        tab-separated blast output (required) with "-outfmt "[6|7]"
+  -o OUTPUT, --output OUTPUT
+                        output BED format file (default: stdout)
+  -s SCORE, --score SCORE
+                        score (default: 0)
+  -e EVALUE, --evalue EVALUE
+                        E-value threshold (default: 1e-30)
+
+```
+
 ## gb2faa.py
 Extract protein sequences from a genbank file downloaded from NCBI
 ### Requirements
