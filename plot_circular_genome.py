@@ -48,7 +48,7 @@ class FeatureObject:
 
 def _get_args():
     parser = argparse.ArgumentParser(
-        description='Generate genome diagrams in SVG. Diagrams for multiple entries are saved separately (hence the lack of output file name option).'
+        description='Generate genome diagrams in SVG. Diagrams for multiple entries are saved separately (hence the lack of output file name option).')
     parser.add_argument(
         '-i',
         '--input',
