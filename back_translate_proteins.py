@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 import argparse
 import sys
@@ -102,24 +102,21 @@ def main(input_file, output_file, file_format, genetic_table_id, desired_gc, rep
             rpt_file.write('\t'.join(map(str, line)) + '\n')
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Back-translate protein sequences into nucleotide sequences.")
-    
-    parser.add_argument('-i', '--input', required=True, help='Input protein sequence file.')
-    
     default_output_name = None
     default_report_name = None
+    parser = argparse.ArgumentParser(description="Back-translate protein sequences into nucleotide sequences.")
+    parser.add_argument('-o', '--output', default=default_output_name, help=f'Output nucleotide sequence file. Default: {default_output_name}')
+    parser.add_argument('-f', '--format', default="fasta", help='File format (default: fasta).')
+    parser.add_argument('-t', '--table', type=int, default=1, help='Genetic table ID (default: 1).')
+    parser.add_argument('--gc', type=float, default=50, help='Desired GC content (default: 50%).')
+    parser.add_argument('-r', '--report', default=default_report_name, help=f'Report file in TSV format detailing backtranslation results. Default: {default_report_name}')
+    parser.add_argument('-i', '--input', required=True, help='Input protein sequence file.')
     args, _ = parser.parse_known_args()
     if args.input:
         base_name = os.path.splitext(os.path.basename(args.input))[0]
         default_output_name = f"{base_name}.fna"
         default_report_name = f"{base_name}_report.tsv"
-    
-    parser.add_argument('-o', '--output', default=default_output_name, help=f'Output nucleotide sequence file. Default: {default_output_name}')
-    parser.add_argument('-f', '--format', default="fasta", help='File format (default: fasta).')
-    parser.add_argument('-t', '--table', type=int, default=1, help='Genetic table ID (default: 1).')
-    parser.add_argument('--gc', type=float, default=0.5, help='Desired GC content (default: 50%).')
-    parser.add_argument('-r', '--report', default=default_report_name, help=f'Report file in TSV format detailing backtranslation results. Default: {default_report_name}')
-    
+        parser.set_defaults(output=default_output_name, report=default_report_name)
     args = parser.parse_args()
 
     main(args.input, args.output, args.format, args.table, args.gc, args.report)
