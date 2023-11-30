@@ -35,53 +35,65 @@ def calculate_gc_percent(sequence):
     gc_percent = round(gc_percent, 2)
     return gc_percent
 
-def get_assembly_stats(records):
-    out_dict = dict()
-    cds_count = 0
-    rrna_count = 0
-    trna_count = 0
-    trna_list = []
-    crispr_count = 0
-    whole_seq = ''
-    first_record = records[0]
-    
-    dbxrefs_dict = dict(map(lambda s : s.split(':'), first_record.dbxrefs))
-    if 'Assembly' in dbxrefs_dict.keys():
-        assembly_name = dbxrefs_dict['Assembly']
-    else: 
-        assembly_name = first_record.id
+def extract_assembly_and_strain_names(first_record):
+    dbxrefs_dict = dict(map(lambda s: s.split(':'), first_record.dbxrefs))
+    assembly_name = dbxrefs_dict.get('Assembly', first_record.id)
+
+    strain_name = "unknown"
     for feature in first_record.features:
         if feature.type == "source":
-            if 'isolate' in feature.qualifiers.keys():
+            if 'isolate' in feature.qualifiers:
                 strain_name = feature.qualifiers['isolate'][0]
-            elif 'strain' in feature.qualifiers.keys():
+            elif 'strain' in feature.qualifiers:
                 strain_name = feature.qualifiers['strain'][0]
-            else:
-                strain_name = "unknown"
+
+    return assembly_name, strain_name
+
+def count_feature(records, feature_type):
+    return sum(1 for record in records for feature in record.features if feature.type == feature_type)
+
+def count_crispr(records):
+    crispr_count = 0
     for record in records:
-        whole_seq += record.seq
         for feature in record.features:
-            if feature.type == 'CDS':
-                cds_count += 1
-            elif feature.type == 'rRNA':
-                rrna_count += 1
-            elif feature.type == 'tRNA':
-                trna_count += 1
-                trna_list.append(feature.qualifiers['product'][0])
-            elif feature.type == 'repeat_region':
+            if feature.type == 'repeat_region' and 'rpt_family' in feature.qualifiers:
                 if feature.qualifiers['rpt_family'][0] == 'CRISPR':
                     crispr_count += 1
-    unique_trna = len(set(trna_list))
-    out_dict['Species'] = first_record.annotations['organism']
-    out_dict['strain'] = strain_name
-    out_dict['Accession'] = assembly_name
-    out_dict['Length'] = len(whole_seq)
-    out_dict['num_contigs'] = len(records)
-    out_dict['GC%'] = calculate_gc_percent(whole_seq)
-    out_dict['CDS'] = cds_count
-    out_dict['rRNA'] = rrna_count
-    out_dict['tRNA'] = '{}({})'.format(trna_count, unique_trna)
-    out_dict['CRISPR'] = crispr_count
+    return crispr_count
+
+def aggregate_sequence_and_calculate_gc(records):
+    whole_seq = ''.join(str(record.seq) for record in records)
+    gc_content = calculate_gc_percent(whole_seq)
+    return len(whole_seq), gc_content
+
+def count_unique_trnas(records):
+    trna_products = set()
+    for record in records:
+        for feature in record.features:
+            if feature.type == 'tRNA' and 'product' in feature.qualifiers:
+                trna_products.add(feature.qualifiers['product'][0])
+    return len(trna_products)
+
+def get_assembly_stats(records):
+    first_record = records[0]
+    assembly_name, strain_name = extract_assembly_and_strain_names(first_record)
+    sequence_length, gc_content = aggregate_sequence_and_calculate_gc(records)
+    unique_trna_count = count_unique_trnas(records)
+
+    out_dict = {
+        'Species': first_record.annotations.get('organism', 'Unknown'),
+        'strain': strain_name,
+        'Accession': assembly_name,
+        'Length': sequence_length,
+        'num_contigs': len(records),
+        'GC%': gc_content,
+        'CDS': count_feature(records, 'CDS'),
+        'rRNA': count_feature(records, 'rRNA'),
+        'tRNA': count_feature(records, 'tRNA'),
+        'Unique tRNAs': unique_trna_count,
+        'CRISPR': count_crispr(records)
+    }
+
     return out_dict
 
 def main():
@@ -98,4 +110,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
