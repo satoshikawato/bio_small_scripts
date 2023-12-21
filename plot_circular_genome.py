@@ -127,7 +127,7 @@ def skew_df(record, window, step, nt):
     for start, seq_part in sliding_window(seq, window, step):
         skew = calculate_dinucleotide_skew(seq_part, nt_1, nt_2)
         dinucleotide_content = (seq_part.count(
-            nt_1) + seq_part.count(nt_1)) / len(seq_part)
+            nt_1) + seq_part.count(nt_2)) / len(seq_part)
         content_dict[start] = dinucleotide_content
         skew_dict[start] = skew
         skew_sum = (skew_sum + skew)
