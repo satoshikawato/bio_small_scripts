@@ -4,9 +4,9 @@
 
 import sys
 import pandas as pd
-import svgwrite
 import argparse
 import logging
+from svgwrite import Drawing
 from svgwrite.container import Group
 from svgwrite.shapes import Line
 from svgwrite.path import Path
@@ -39,7 +39,7 @@ def _get_args():
     return args
 
 
-def draw_hits(df, query_len, subject_len, total_width, total_height, max_len):
+def draw_hits(df, query_len, subject_len, total_width, total_height):
     hit_group = Group(id="hits")
     for index, row in df.iterrows():
         qstart = int(total_width * int(row['qstart']) / query_len)
@@ -76,7 +76,7 @@ def draw_hits(df, query_len, subject_len, total_width, total_height, max_len):
 
 
 def create_tick_label_paths_list(
-        ticks, tick_width, size, total_span, seq_len, axis):
+        ticks, total_span, seq_len, axis):
     tick_label_paths_list = []
 
     anchor_value = "middle"
@@ -138,7 +138,7 @@ def create_tick_paths_list(ticks, tick_width, size, total_span, seq_len, axis):
     return tick_paths_list
 
 
-def create_grid_paths_list(ticks, tick_width, size,
+def create_grid_paths_list(ticks, tick_width, 
                            total_width, total_height, seq_len, axis):
     grid_paths_list = []
     for tick in ticks:
@@ -162,7 +162,7 @@ def create_grid_paths_list(ticks, tick_width, size,
     return grid_paths_list
 
 
-def create_ticks(seq_len, total_span, max_len, axis):
+def create_ticks(seq_len, total_span, axis):
     tick_large, tick_small = tick_size(seq_len)
     tick_group = Group(id="tick")
     ticks_large = list(range(0, seq_len, tick_large))
@@ -173,12 +173,6 @@ def create_ticks(seq_len, total_span, max_len, axis):
                 seq_len,
                 tick_small)) if x %
         tick_large != 0]
-    ticks_large_nonzero = [
-        x for x in list(
-            range(
-                0,
-                seq_len,
-                tick_large)) if x != 0]
     tick_paths_large = create_tick_paths_list(
         ticks_large, 1, "large", total_span, seq_len, axis)
     tick_paths_small = create_tick_paths_list(
@@ -190,15 +184,13 @@ def create_ticks(seq_len, total_span, max_len, axis):
     return tick_group
 
 
-def create_labels(seq_len, total_span, max_len, axis):
+def create_labels(seq_len, total_span, axis):
     tick_large, tick_small = tick_size(seq_len)
     label_group = Group(id="label")
     ticks_large = list(range(0, seq_len, tick_large))
     tick_small = list(range(0, seq_len, tick_small))
-    ticks_small = [x for x in tick_small if x % tick_large != 0]
-    ticks_large_nonzero = [x for x in ticks_large if x != 0]
     tick_label_paths_large = create_tick_label_paths_list(
-        ticks_large, 1, "large", total_span, seq_len, axis)
+        ticks_large, total_span, seq_len, axis)
     for tick_label_path_large in tick_label_paths_large:
         label_group.add(tick_label_path_large)
     return label_group
@@ -226,7 +218,7 @@ def tick_size(seq_len):
     return tick_large, tick_small
 
 
-def create_grids(seq_len, total_width, total_height, max_len, axis):
+def create_grids(seq_len, total_width, total_height, axis):
     tick_large, tick_small = tick_size(seq_len)
     grid_group = Group(id="grid")
     grids_large = list(range(0, seq_len, tick_large))
@@ -236,13 +228,12 @@ def create_grids(seq_len, total_width, total_height, max_len, axis):
     grid_paths_large = create_grid_paths_list(
         grids_large_nonzero,
         1,
-        "large",
         total_width,
         total_height,
         seq_len,
         axis)
     grid_paths_small = create_grid_paths_list(
-        grids_small, 1, "small", total_width, total_height, seq_len, axis)
+        grids_small, 1, total_width, total_height, seq_len, axis)
     for grid_path_large in grid_paths_large:
         grid_group.add(grid_path_large)
     for grid_path_small in grid_paths_small:
@@ -264,7 +255,7 @@ def create_frame(total_width, total_height):
 
 
 def create_canvas(file_name, total_width, total_height):
-    dwg = svgwrite.Drawing(
+    dwg = Drawing(
         filename=file_name,
         size=(
             str(total_width) +
@@ -296,7 +287,7 @@ def hsps_to_df(hsps):
     return df
 
 
-def create_definition(seq_len, total_span, max_len, accession, title, axis):
+def create_definition(total_span, title, axis):
     definition_group = Group(id="definiton")
     anchor_value = "middle"
     baseline_value = "middle"
@@ -309,7 +300,7 @@ def create_definition(seq_len, total_span, max_len, accession, title, axis):
         text_y = total_span * 0.5
         angle = 'rotate({},{}, {})'.format(-90, text_x, text_y)
 
-    definition_text = "{} {}".format(accession, title)
+    definition_text = "{}".format(title)
     definition_path = Text(definition_text, insert=(text_x, text_y),
                            stroke='none',
                            fill='black',
@@ -371,12 +362,12 @@ def main():
                     filename, total_width + offset, total_height + offset)
 
                 grids_horizontal = create_grids(
-                    query_len, total_width, total_height, max_len, "horizontal")
+                    query_len, total_width, total_height, "horizontal")
                 grids_horizontal.translate(offset, offset)
                 canvas.add(grids_horizontal)
 
                 grids_vertical = create_grids(
-                    subject_len, total_width, total_height, max_len, "vertical")
+                    subject_len, total_width, total_height, "vertical")
                 grids_vertical.translate(offset, offset)
                 canvas.add(grids_vertical)
 
@@ -385,38 +376,37 @@ def main():
                     query_len,
                     subject_len,
                     total_width,
-                    total_height,
-                    max_len)
+                    total_height)
                 hits.translate(offset, offset)
                 canvas.add(hits)
 
                 ticks_hotizontal = create_ticks(
-                    query_len, total_width, max_len, "horizontal")
+                    query_len, total_width, "horizontal")
                 ticks_hotizontal.translate(offset, 0)
                 canvas.add(ticks_hotizontal)
 
                 ticks_vertical = create_ticks(
-                    subject_len, total_height, max_len, "vertical")
+                    subject_len, total_height, "vertical")
                 ticks_vertical.translate(0, offset)
                 canvas.add(ticks_vertical)
 
                 labels_horizontal = create_labels(
-                    query_len, total_width, max_len, "horizontal")
+                    query_len, total_width, "horizontal")
                 labels_horizontal.translate(offset, 50)
                 canvas.add(labels_horizontal)
 
                 labels_vertical = create_labels(
-                    subject_len, total_height, max_len, "vertical")
+                    subject_len, total_height, "vertical")
                 labels_vertical.translate(50, offset)
                 canvas.add(labels_vertical)
 
                 definition_horizontal = create_definition(
-                    query_len, total_width, max_len, query_id, query_title, "horizontal")
+                    total_width, query_title, "horizontal")
                 definition_horizontal.translate(offset, 20)
                 canvas.add(definition_horizontal)
 
                 definition_vertical = create_definition(
-                    subject_len, total_height, max_len, subject_id, subject_title, "vertical")
+                    total_height, subject_title, "vertical")
                 definition_vertical.translate(20, 20)
                 canvas.add(definition_vertical)
 
