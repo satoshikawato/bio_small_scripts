@@ -1,16 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-
 import argparse
 import sys
 from collections import defaultdict
-from Bio import SeqIO, AlignIO
-from Bio.SeqRecord import SeqRecord
-from Bio.Seq import Seq
 from collections import Counter
 from contextlib import redirect_stdout
-
+from Bio import AlignIO
 
 def _get_args():
     parser = argparse.ArgumentParser(
@@ -68,10 +64,13 @@ def _get_args():
 
 
 def get_ref_record(records, ref_name):
-    record_dict = dict()
-    for record in records:
-        record_dict[record.id] = record
-    ref_record = record_dict[ref_name]
+    if ref_name is not None:
+        record_dict = dict()
+        for record in records:
+            record_dict[record.id] = record
+        ref_record = record_dict[ref_name]
+    else:
+        ref_record = records[0]
     return ref_record
 
 
@@ -79,15 +78,13 @@ def check_start_end_coords(
         ref_record,
         start,
         end,
-        gap_character,
-        gap_inclusive):
+        gap_character):
     ref_record_len_gap_exclusive = len(ref_record.seq.ungap(gap_character))
     if start < 1:
         start = 1
     if end > ref_record_len_gap_exclusive:
         end = ref_record_len_gap_exclusive
     return start, end
-
 
 def residue_count(ref_record, gap_character, gap_inclusive):
     gap_character = gap_character
@@ -106,7 +103,6 @@ def residue_count(ref_record, gap_character, gap_inclusive):
                 residue_count_dict[residue_count] = i
                 residue_count += 1
     return residue_count_dict
-
 
 def get_residues(records):
     alignment_length = int(records.get_alignment_length())
@@ -135,16 +131,14 @@ def get_residues(records):
         residues.append(residue)
     return residues
 
-
-def add_conservation(residues, start, end, wrap):
+def add_conservation(residues):
     residues = "".join(residues)
     record_id = "".ljust(15, " ")
     out_text = "{} {} {} {}".format(
         record_id, " ".rjust(4), residues, " ".rjust(4))
     return out_text
 
-
-def make_text(record, start, end, wrap):
+def make_text(record, start, end):
     record_id = str(record.id)[:15].ljust(15, " ")
     out_text = "{} {} {} {}".format(
         record_id,
@@ -152,7 +146,6 @@ def make_text(record, start, end, wrap):
         record.seq,
         str(end).rjust(4))
     return out_text
-
 
 def make_start_end_dict(records, residue_dict, start, end):
     record_ids = []
@@ -162,11 +155,10 @@ def make_start_end_dict(records, residue_dict, start, end):
     start_end_dict = {}
     for record in records:
         name_space = max_name_length - len(record.id)
-        start_loc = len(record.seq[:residue_dict[start]].ungap()) + 1
-        end_loc = len(record.seq[:residue_dict[end] + 1].ungap())
+        start_loc = len(record.seq[:residue_dict[start]].replace(gap_character, "")) + 1
+        end_loc = len(record.seq[:residue_dict[end] + 1].replace(gap_character, ""))
         start_end_dict[record.id] = (name_space, start_loc, end_loc)
     return start_end_dict
-
 
 def define_preceding_residues(
         records,
@@ -189,13 +181,12 @@ def define_preceding_residues(
         aln_out = records
     for record in aln_preceding:
         if ref_name is not None:
-            preceding_residues[record.id] = (len(record.seq.ungap()) + 2)
+            preceding_residues[record.id] = (len(record.seq.replace(gap_character, "")) + 2)
         else:
-            preceding_residues[record.id] = (len(record.seq.ungap()) + 1)
+            preceding_residues[record.id] = (len(record.seq.replace(gap_character, "")) + 1)
     return aln_out, preceding_residues
 
-
-def print_records(records, start, end, wrap, preceding_residues):
+def print_records(records, start, end, wrap, preceding_residues, gap_character):
     count = 0
     residues = get_residues(records)
 
@@ -210,21 +201,20 @@ def print_records(records, start, end, wrap, preceding_residues):
         chunk_seq_len[key] = preceding_residues[key]
     for chunk in range(0, num_chunks):
         residues = residues_chunks[chunk]
-        residue_group = add_conservation(residues, start, end, wrap)
+        residue_group = add_conservation(residues)
         print(residue_group)
         record_chunk = record_chunks[chunk]
         for record in record_chunk:
             count += 1
-            chunk_seq_len[record.id] += len(record.seq.ungap())
-            start = (chunk_seq_len[record.id] - len(record.seq.ungap()))
-            if len(record.seq.ungap()) == 0:
+            chunk_seq_len[record.id] += len(record.seq.replace(gap_character, ""))
+            start = (chunk_seq_len[record.id] - len(record.seq.replace(gap_character, "")))
+            if len(record.seq.replace(gap_character, "")) == 0:
                 end = start
             else:
                 end = (chunk_seq_len[record.id] - 1)
-            record_group = make_text(record, start, end, wrap)
+            record_group = make_text(record, start, end)
             print(record_group)
         print()
-
 
 def main():
     args = _get_args()
@@ -237,11 +227,8 @@ def main():
     gap_character = args.gap
     gap_inclusive = args.gap_inclusive
     records = AlignIO.read(in_fa, "fasta")
-    num_of_entries = len(records)
-    if ref_name is not None:
-        ref_record = get_ref_record(records, ref_name)
-    else:
-        ref_record = records[0]
+    ref_record = get_ref_record(records, ref_name)
+
     if start is None:
         start = 1
     if end is None or end > len(ref_record.seq):
@@ -252,10 +239,9 @@ def main():
     if out_file is not None:
         with open(out_file, 'w') as f:
             with redirect_stdout(f):
-                print_records(aln_out, start, end, wrap, preceding_residues)
+                print_records(aln_out, start, end, wrap, preceding_residues, gap_character)
     else:
-        print_records(aln_out, start, end, wrap, preceding_residues)
-
+        print_records(aln_out, start, end, wrap, preceding_residues, gap_character)
 
 if __name__ == "__main__":
     main()
