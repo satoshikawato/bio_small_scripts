@@ -5,7 +5,7 @@ See [here](https://qiita.com/satoshi_kawato) (in Japanese) for the details and m
 
 2023-12-21: `plot_linear_genome.py` and `plot_circular_genome.py` will be merged into a single package, which will be made public soon.
 
-2024-01-22:our new genome drawer [gbdraw](https://github.com/satoshikawato/gbdraw)  will be relased soon!
+2024-01-22: our new genome drawer [gbdraw](https://github.com/satoshikawato/gbdraw)  will be released soon!
 ## blast2bed.py
 convert BLASTN/BLASTX/TBLASTX output into BED format
 ## Requirements
