@@ -3,9 +3,12 @@
 
 import argparse
 import gzip
-from Bio import SeqIO
+from Bio.SeqIO.QualityIO import FastqGeneralIterator
+from Bio.SeqIO.FastaIO import SimpleFastaParser
 from Bio.SeqUtils import GC
-import re
+import gzip
+import logging
+import time
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Extract and filter FASTA/FASTQ entries by various criteria")
@@ -16,50 +19,78 @@ def parse_arguments():
     parser.add_argument("-M", "--max_length", type=int, help="Maximum sequence length to include")
     parser.add_argument("--gc_min", type=float, help="Minimum GC content to include (as a percentage)")
     parser.add_argument("--gc_max", type=float, help="Maximum GC content to include (as a percentage)")
-    parser.add_argument("--q_min", type=float, help="Minimum average quality to include (FASTQ only)")
-    parser.add_argument("--q_max", type=float, help="Maximum average quality to include (FASTQ only)")
+    parser.add_argument("-q", "--qual_min", type=int, help="Minimum average quality score to include")
+    parser.add_argument("-Q", "--qual_max", type=int, help="Maximum average quality score to include")
+    parser.add_argument("-c", "--compress_level", type=int, default=3, help="Gzip compression level (1-9)")
     return parser.parse_args()
 
-def seq_passes_filters(record, args):
-    if args.desired_ids and not record.id in args.desired_ids:
-        return False
-    if args.min_length and len(record.seq) < args.min_length:
-        return False
-    if args.max_length and len(record.seq) > args.max_length:
-        return False
-    if args.gc_min and GC(record.seq) < args.gc_min:
-        return False
-    if args.gc_max and GC(record.seq) > args.gc_max:
-        return False
-    if args.q_min and sum(record.letter_annotations["phred_quality"]) / len(record) < args.q_min:
-        return False
-    if args.q_max and sum(record.letter_annotations["phred_quality"]) / len(record) > args.q_max:
-        return False
-    return True
-
-def read_id_list(id_file):
-    with open(id_file, 'r') as f:
-        return {line.strip() for line in f}
-
-def filter_sequences(input_file, output_file, args):
-    format = "fasta" if input_file.endswith(".fasta") or input_file.endswith(".fa") else "fastq"
-    opener = gzip.open if input_file.endswith(".gz") else open
-    with opener(input_file, 'rt') as in_handle, opener(output_file, 'wt') as out_handle:
-        records = (record for record in SeqIO.parse(in_handle, format) if seq_passes_filters(record, args))
-        count = SeqIO.write(records, out_handle, format)
-        print(f"Extracted {count} records")
-
-def main():
-    args = parse_arguments()
-
-    # If an ID file is specified, update the desired_ids set
-    if args.id_file:
-        args.desired_ids = read_id_list(args.id_file)
+def open_file(file_path, mode, compresslevel):
+    if file_path.endswith('.gz'):
+        if 'w' in mode:
+            return gzip.open(file_path, mode + 't', compresslevel=compresslevel)  # Add 't' to ensure text mode
+        else:
+            return gzip.open(file_path, mode + 't')  # For reading, compresslevel is not needed
     else:
-        args.desired_ids = None
+        return open(file_path, mode)
 
-    filter_sequences(args.input, args.output, args)
+def average_quality(qualities):
+    return sum([ord(q) - 33 for q in qualities]) / len(qualities)
+
+def filter_sequences(input_file, output_file, id_file=None, min_length=None, max_length=None, gc_min=None, gc_max=None, qual_min=None, compresslevel=3):
+    processed_sequences = 0
+    start_time = time.time()
+    output_fasta = output_file.endswith('.fa') or output_file.endswith('.fasta')
+    with open_file(input_file, 'rt', compresslevel) as infile, open_file(output_file, 'wt', compresslevel=compresslevel) as outfile:
+        if input_file.endswith('.fastq') or input_file.endswith('.fq') or input_file.endswith('.fq.gz') or input_file.endswith('.fastq.gz'):
+            for title, seq, qual in FastqGeneralIterator(infile):
+                processed_sequences += 1
+                if processed_sequences % 10000 == 0:  # Log progress every 10000 sequences
+                    logging.info(f"Processed {processed_sequences} sequences") 
+                if id_file and title.split()[0] not in id_file:
+                    continue
+                if min_length and len(seq) < min_length:
+                    continue
+                if max_length and len(seq) > max_length:
+                    continue
+                if gc_min and GC(seq) < gc_min:
+                    continue
+                if gc_max and GC(seq) > gc_max:
+                    continue
+                if qual_min and average_quality(qual) < qual_min:
+                    continue
+                if output_fasta:
+                    # Write in FASTA format if output is .fa or .fasta
+                    outfile.write(f">{title}\n{seq}\n")
+                else:
+                    # Write in FASTQ format if output is not .fa or .fasta
+                    outfile.write(f"@{title}\n{seq}\n+\n{qual}\n")
+               
+        else:  # Assume FASTA format
+            for title, seq in SimpleFastaParser(infile):
+                processed_sequences += 1
+                if processed_sequences % 10000 == 0:  # Log progress every 10000 sequences
+                    logging.info(f"Processed {processed_sequences} sequences") 
+                if id_file and title.split()[0] not in id_file:
+                    continue
+                if min_length and len(seq) < min_length:
+                    continue
+                if max_length and len(seq) > max_length:
+                    continue
+                if gc_min and GC(seq) < gc_min:
+                    continue
+                if gc_max and GC(seq) > gc_max:
+                    continue
+                outfile.write(f">{title}\n{seq}\n")
+    end_time = time.time()
+def main():
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    args = parse_arguments()
+    id_set = set()
+    if args.id_file:
+        with open(args.id_file) as f:
+            for line in f:
+                id_set.add(line.strip())
+    filter_sequences(args.input, args.output, id_set if args.id_file else None, args.min_length, args.max_length, args.gc_min, args.gc_max, args.qual_min, compresslevel=args.compress_level)
 
 if __name__ == "__main__":
     main()
-
