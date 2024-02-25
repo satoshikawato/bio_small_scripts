@@ -98,7 +98,6 @@ def process_chunk(input_chunk, ids, min_length, max_length, gc_min, gc_max, qual
         output_chunk = [filter_sequence(record, ids, min_length, max_length, gc_min, gc_max, qual_min, qual_max, reverse_complement) for record in records if filter_sequence(record, ids, min_length, max_length, gc_min, gc_max, qual_min, qual_max, reverse_complement) is not None]
     return output_chunk
 
-
 def main():
     args = parse_arguments()
     logging.info(f"Filtering {args.input} and writing to {args.output}")
@@ -127,14 +126,8 @@ def main():
             else:
                 output_format = _detect_format_from_content(input_file)
         with dnaio.open(args.output, mode="w", compression_level=args.compression_level, open_threads=dnaio_open_threads, fileformat=output_format) as output_handle:
-            chunk_count = 0
-            for chunk in dnaio.read_chunks(input_file):  # dnaio.read_chunks() is a generator that yields chunks of sequences from the input file. What happens when we use concurrent.futures.ThreadPoolExecutor within the iterator? The answer is that the iterator will yield chunks of sequences from the input file. The ThreadPoolExecutor will process the chunks of sequences in parallel.
-                chunk_count += 1
-                chunk_in_bytes = chunk.tobytes()
-                futures = []
-                with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
-                    future = executor.submit(process_chunk, chunk_in_bytes, id_set, args.min_length, args.max_length, args.gc_min, args.gc_max, args.qual_min, args.qual_max, args.reverse_complement)
-                    futures.append(future)
+            with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
+                futures = [executor.submit(process_chunk, chunk.tobytes(), id_set, args.min_length, args.max_length, args.gc_min, args.gc_max, args.qual_min, args.qual_max, args.reverse_complement) for chunk in dnaio.read_chunks(input_file, buffer_size=4194304)]
                 for future in concurrent.futures.as_completed(futures):
                     number_of_saved_reads += len(future.result())
                     for record in future.result():
