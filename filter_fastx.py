@@ -26,6 +26,8 @@ def parse_arguments():
     parser.add_argument("-o", "--output", required=True, help="Output FASTA/FASTQ file (gzipped if ending with .gz)")
     parser.add_argument("-m", "--min_length", type=int, help="Minimum sequence length to include")
     parser.add_argument("-M", "--max_length", type=int, help="Maximum sequence length to include")
+    parser.add_argument("-n", "--n_min", type=int, help="Minimum N content to include (as a percentage)")
+    parser.add_argument("-N", "--n_max", type=int, help="Minimum N content to include (as a percentage)")
     parser.add_argument("--gc_min", type=float, help="Minimum GC content to include (as a percentage)")
     parser.add_argument("--gc_max", type=float, help="Maximum GC content to include (as a percentage)")
     parser.add_argument("-q", "--qual_min", type=int, help="Minimum average quality score to include")
@@ -45,9 +47,12 @@ def get_reverse_complement(sequence: str, qualities: str) -> Tuple[str, str]:
     return out_sequence, out_quality
 
 
+def get_N(sequence: str) -> float:
+    N_count = sequence.count('N')
+    N_percent = 100 * (N_count / len(sequence))
+    return round(N_percent, 2)
+
 def GC(sequence: str) -> float:
-    #counter = Counter(sequence)
-    #gc_count = counter['G'] + counter['C']
     gc_count = sequence.count('G') + sequence.count('C')
     gc_percent = 100 * (gc_count / len(sequence))
     return round(gc_percent, 2)
@@ -58,7 +63,7 @@ def average_quality(qualities) -> float:
     return np.mean(quality_scores)
 
 
-def filter_sequence(record, ids, min_length, max_length, gc_min, gc_max, qual_min, qual_max, reverse_complement):
+def filter_sequence(record, ids, min_length, max_length, gc_min, gc_max, n_min, n_max, qual_min, qual_max, reverse_complement):
     seq = record.sequence
     qual = record.qualities
 
@@ -77,7 +82,14 @@ def filter_sequence(record, ids, min_length, max_length, gc_min, gc_max, qual_mi
             return None
         if gc_max is not None and gc > gc_max:
             return None
-
+        
+    if n_min is not None or n_max is not None:
+        n_content = get_N(seq)
+        if n_min is not None and n_content < n_max:
+            return None
+        if n_min is not None and n_content > n_max:
+            return None
+        
     if qual_min is not None or qual_max is not None:
         avg_qual = average_quality(qual)
         if qual_min is not None and avg_qual < qual_min:
@@ -91,12 +103,13 @@ def filter_sequence(record, ids, min_length, max_length, gc_min, gc_max, qual_mi
     return record
 
 
-def process_chunk(input_chunk, ids, min_length, max_length, gc_min, gc_max, qual_min, qual_max, reverse_complement):
+def process_chunk(input_chunk, ids, min_length, max_length, gc_min, gc_max, n_min, n_max, qual_min, qual_max, reverse_complement):
     output_chunk = []
     with io.BytesIO(input_chunk) as temp_file:  # this function is used to read the input_chunk without creating a temporary file
         records = list(dnaio.open(temp_file))
-        output_chunk = [filter_sequence(record, ids, min_length, max_length, gc_min, gc_max, qual_min, qual_max, reverse_complement) for record in records if filter_sequence(record, ids, min_length, max_length, gc_min, gc_max, qual_min, qual_max, reverse_complement) is not None]
+        output_chunk = [filter_sequence(record, ids, min_length, max_length, gc_min, gc_max, n_min, n_max, qual_min, qual_max, reverse_complement) for record in records if filter_sequence(record, ids, min_length, max_length, gc_min, gc_max, qual_min, qual_max, reverse_complement) is not None]
     return output_chunk
+
 
 def main():
     args = parse_arguments()
@@ -127,7 +140,7 @@ def main():
                 output_format = _detect_format_from_content(input_file)
         with dnaio.open(args.output, mode="w", compression_level=args.compression_level, open_threads=dnaio_open_threads, fileformat=output_format) as output_handle:
             with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
-                futures = [executor.submit(process_chunk, chunk.tobytes(), id_set, args.min_length, args.max_length, args.gc_min, args.gc_max, args.qual_min, args.qual_max, args.reverse_complement) for chunk in dnaio.read_chunks(input_file, buffer_size=4194304)]
+                futures = [executor.submit(process_chunk, chunk.tobytes(), id_set, args.min_length, args.max_length, args.gc_min, args.gc_max, args.n_min, args.n_max, args.qual_min, args.qual_max, args.reverse_complement) for chunk in dnaio.read_chunks(input_file, buffer_size=4194304)]
                 for future in concurrent.futures.as_completed(futures):
                     number_of_saved_reads += len(future.result())
                     for record in future.result():
