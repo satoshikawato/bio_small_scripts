@@ -82,8 +82,9 @@ aligner.match_score = 2
 aligner.mismatch_score = -3
 aligner.open_gap_score = -10
 aligner.extend_gap_score = -2
-aligner.query_end_gap_score = -1  # Slightly penalize end gaps to allow some flexibility but still discourage them
-aligner.target_end_gap_score = -1  # Similar reasoning for the target sequence
+aligner.internal_gap_score = -10
+aligner.query_end_gap_score = 0  # Slightly penalize end gaps to allow some flexibility but still discourage them
+aligner.target_end_gap_score = 0  # Similar reasoning for the target sequence
 
 def get_pairwise_identity(query: str, subject: str, aligner):
     # https://www.biostars.org/p/9553992/
@@ -91,19 +92,48 @@ def get_pairwise_identity(query: str, subject: str, aligner):
     query_seq = query.seq
     query_rc_seq = query_seq.reverse_complement()    
     subject_seq = subject.seq
-
-    
     # Perform forward alignment
     alignments_f = aligner.align(query_seq, subject_seq)
-    alignment_f = alignments_f[0]
+    valid_alignments_f = []
+    for tmp_alignment_f in alignments_f:
+        if tmp_alignment_f.aligned[0][-1][-1] >= (len(query_seq)-2):
+            valid_alignments_f.append(tmp_alignment_f)
+        else:
+            continue
+    if len(valid_alignments_f) > 0:
+        # to sort alignments by alignment.score, use the following:
+        valid_alignments_f= sorted(valid_alignments_f, key=lambda x: x.score, reverse=True)
+        alignment_f = valid_alignments_f[0]
+    else:
+        alignment_f = None
     # Perform reverse complement alignment
     alignments_r = aligner.align(query_rc_seq, subject_seq)
-    alignment_r = alignments_r[0]
-    # Select final alignment based on higher alignment score
-    if alignment_f.score >= alignment_r.score:
-        final_alignment = alignment_f
+    valid_alignments_r = []
+    for tmp_alignment_r in alignments_r:
+        if (len(query_seq) - tmp_alignment_r.aligned[0][0][0]) >= (len(query_seq)-2):
+            valid_alignments_r.append(tmp_alignment_r)
+        else:
+            continue
+    
+    if len(valid_alignments_r) > 0:
+        # to sort alignments by alignment.score, use the following:
+        valid_alignments_r= sorted(valid_alignments_r, key=lambda x: x.score, reverse=True)
+        alignment_r = valid_alignments_r[0]
     else:
+        alignment_r = None
+    # Select final alignment based on higher alignment score
+    if alignment_f and alignment_r:
+        if alignment_f.score >= alignment_r.score:
+            final_alignment = alignment_f
+        else:
+            final_alignment = alignment_r
+    elif alignment_f and not alignment_r:
+        final_alignment = alignment_f
+    elif alignment_r and not alignment_f:
         final_alignment = alignment_r
+    else:
+        final_alignment = None
+        return None
     # Extract aligned sequences from the final alignment
     aln1, aln2 = final_alignment
     
@@ -114,29 +144,53 @@ def get_pairwise_identity(query: str, subject: str, aligner):
     identity = 100 * identities / len(query_seq)
     # Calculate query coverage
     query_coverage = 100 * (final_alignment.aligned[0][-1][-1] - final_alignment.aligned[0][0][0]) / len(query)
-
-    if final_alignment == alignment_f:
-        subject_start_coordinate = final_alignment.aligned[1][0][0]
-        subject_end_coordinate = final_alignment.aligned[1][-1][-1]
-        query_start_coordinate = final_alignment.aligned[0][0][0]
-        query_end_coordinate = final_alignment.aligned[0][-1][-1]
-        subject_match_sequence = subject_seq[subject_start_coordinate:subject_end_coordinate]
-    else:
-        subject_start_coordinate = final_alignment.aligned[1][-1][-1]
-        subject_end_coordinate = final_alignment.aligned[1][0][0]
-        query_start_coordinate = len(query_seq) - final_alignment.aligned[0][-1][-1]
-        query_end_coordinate = len(query_seq) - final_alignment.aligned[0][0][0]
-        subject_match_sequence = subject_seq[subject_end_coordinate:subject_start_coordinate].reverse_complement()
+    if final_alignment is not None:
+        if alignment_f and alignment_r:
+            if final_alignment == alignment_f:
+                subject_start_coordinate = final_alignment.aligned[1][0][0]
+                subject_end_coordinate = final_alignment.aligned[1][-1][-1]
+                query_start_coordinate = final_alignment.aligned[0][0][0]
+                query_end_coordinate = final_alignment.aligned[0][-1][-1]
+                subject_match_sequence = subject_seq[subject_start_coordinate:subject_end_coordinate]
+            else:
+                subject_start_coordinate = final_alignment.aligned[1][-1][-1]
+                subject_end_coordinate = final_alignment.aligned[1][0][0]
+                query_start_coordinate = len(query_seq) - final_alignment.aligned[0][-1][-1]
+                query_end_coordinate = len(query_seq) - final_alignment.aligned[0][0][0]
+                subject_match_sequence = subject_seq[subject_end_coordinate:subject_start_coordinate].reverse_complement()
+        else:
+            if alignment_f:
+                subject_start_coordinate = final_alignment.aligned[1][0][0]
+                subject_end_coordinate = final_alignment.aligned[1][-1][-1]
+                query_start_coordinate = final_alignment.aligned[0][0][0]
+                query_end_coordinate = final_alignment.aligned[0][-1][-1]
+                subject_match_sequence = subject_seq[subject_start_coordinate:subject_end_coordinate]
+            elif alignment_r:
+                subject_start_coordinate = final_alignment.aligned[1][-1][-1]
+                subject_end_coordinate = final_alignment.aligned[1][0][0]
+                query_start_coordinate = len(query_seq) - final_alignment.aligned[0][-1][-1]
+                query_end_coordinate = len(query_seq) - final_alignment.aligned[0][0][0]
+                subject_match_sequence = subject_seq[subject_end_coordinate:subject_start_coordinate].reverse_complement()
+            else:
+                return None
     return round(identity, 2), round(query_coverage, 2), query_start_coordinate, query_end_coordinate, subject_start_coordinate, subject_end_coordinate, subject_match_sequence
 
 
 def trim_contig(contig, result_fwd, result_rev, keep_primers):
-    if keep_primers == True:
-        trimmed_start = result_fwd[4]
-        trimmed_end = result_rev[4]
+    if result_fwd:
+        if keep_primers == True:
+            trimmed_start = result_fwd[4]
+        else:
+            trimmed_start = result_fwd[5]
     else:
-        trimmed_start = result_fwd[5]
-        trimmed_end = result_rev[5]
+        trimmed_start = 0
+    if result_rev:
+        if keep_primers == True:
+            trimmed_end = result_rev[4]
+        else:
+            trimmed_end = result_rev[5]
+    else:
+        trimmed_end = len(contig.seq)
     trimmed_contig = contig.seq[trimmed_start:trimmed_end]
     return trimmed_contig
 
@@ -181,18 +235,30 @@ def determine_output_file_prefix(in_fa, out_fa):
 def process_contig(contig, primer_fwd, primer_rev, keep_primers, min_len):
     result_fwd = get_pairwise_identity(query=primer_fwd, subject=contig, aligner=aligner)
     result_rev = get_pairwise_identity(query=primer_rev, subject=contig, aligner=aligner)
-    primer_orientation = determine_primer_orientations(result_fwd, result_rev)
+    primer_orientation = ""
+    if result_fwd and result_rev:
+        primer_orientation = determine_primer_orientations(result_fwd, result_rev)
     if primer_orientation == "face_to_face":
         trimmed_seq = trim_contig(contig, result_fwd, result_rev, keep_primers)  
+        description = 'fwd_name:{},fwd_seq:{},rev_name:{},rev_seq:{}'.format(primer_fwd.id, str(primer_fwd.seq), primer_rev.id, str(primer_rev.seq))
     else:
-        return None
+        if result_fwd and not result_rev:
+            trimmed_seq = trim_contig(contig, result_fwd, None, keep_primers)
+            description = 'fwd_name:{},fwd_seq:{},rev_name:{},rev_seq:{}'.format(primer_fwd.id, str(primer_fwd.seq), "", "")
+        elif not result_fwd and result_rev:
+            trimmed_seq = trim_contig(contig, None, result_rev, keep_primers)
+            description = 'fwd_name:{},fwd_seq:{},rev_name:{},rev_seq:{}'.format("", "", primer_rev.id, str(primer_rev.seq))
+        else:
+            trimmed_seq = contig.seq
+            description = 'fwd_name:{},fwd_seq:{},rev_name:{},rev_seq:{}'.format("", "", "", "")
     if len(trimmed_seq) >= min_len:
         has_valid_amplicon = True
     else:
         has_valid_amplicon = False
 
     if has_valid_amplicon == True:
-        description = 'fwd_name:{},fwd_seq:{},rev_name:{},rev_seq:{}'.format(primer_fwd.id, str(primer_fwd.seq), primer_rev.id, str(primer_rev.seq))
+
+        
         trimmed_record = SeqRecord(trimmed_seq, id=contig.id,description=description)
         return trimmed_record
     else:
