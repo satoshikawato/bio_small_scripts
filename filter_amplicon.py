@@ -108,7 +108,12 @@ def main():
         dnaio_open_threads = 0
     else:
         dnaio_open_threads = num_threads
-    input_basename = os.path.basename(args.input).split(".")[0]
+    # To ensure that the output files are named correctly, we need to remove the file extension from the input file. To eliminate "fq.gz" or ".fastq" etc, we split the basename by "." and take the first element
+    input_basename = os.path.basename(args.input).split(".")
+    if len(input_basename) >=3:
+        input_basename = ".".join(input_basename[:-2])
+    else:
+        input_basename = ".".join(input_basename[:-1])
     num_workers = num_threads
     with xopen(args.input, mode="rb", threads=num_threads) as input_file:
         number_of_saved_reads = 0

@@ -60,10 +60,10 @@ def reorient_fasta(in_records, blast_out_dict):
     for record in in_records:
         line = blast_out_dict[record.id][0]
         if int(line[6]) > int(line[7]):
-            out_record = SeqRecord(record.seq.reverse_complement(), id=line[1], description=record.description)
+            out_record = SeqRecord(record.seq.reverse_complement(), id=line[0], description="")
             out_records_tmp.append(out_record)
         else:
-            out_record = SeqRecord(record.seq, id=line[1], description=record.description)
+            out_record = SeqRecord(record.seq, id=line[0], description="")
             out_records_tmp.append(out_record)
     for record in out_records_tmp:
         out_records_dict[record.id] = record
