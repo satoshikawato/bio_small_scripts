@@ -20,14 +20,14 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 complement = {ord('A'): 'T', ord('T'): 'A', ord('C'): 'G', ord('G'): 'C', ord('N'): 'N', ord('R'): 'Y', ord('Y'): 'R', ord('S'): 'S', ord('W'): 'W', ord('K'): 'M', ord('M'): 'K', ord('B'): 'V', ord('V'): 'B', ord('D'): 'H', ord('H'): 'D'}
 
-def parse_arguments():
+def parse_arguments(raw_args=None):
     parser = argparse.ArgumentParser(description="Extract and filter FASTQ entries")
     parser.add_argument("-i", "--input", required=True, help="Input FASTQ file (optionally gzipped)")
     parser.add_argument('-f', '--fwd_seq', help='forward primer sequence', type=str, default="")
     parser.add_argument('-r', '--rev_seq', help='reverse primer sequence', type=str, default="")
     parser.add_argument("-t", "--num_threads", type=int, default=0, help="Number of threads to use (default: 0, meaning all available cores)")
     parser.add_argument("-c", "--compression_level", type=int, default=3, help="Compression level for gzip output (default: 3)")
-    return parser.parse_args()
+    return parser.parse_args(raw_args)
 
 def get_reverse_complement(sequence: str, qualities: str) -> Tuple[str, str]:
     out_sequence = sequence.translate(complement)[::-1]  # Reverse the sequence
@@ -94,8 +94,8 @@ def process_chunk(input_chunk, forward_primer, reverse_primer):
             output_chunk[destination].append(record)
     return output_chunk
 
-def main():
-    args = parse_arguments()
+def main(raw_args=None):
+    args = parse_arguments(raw_args)
     forward_primer = args.fwd_seq
     reverse_primer = args.rev_seq
     logging.info(f"Filtering {args.input}")
@@ -109,11 +109,16 @@ def main():
     else:
         dnaio_open_threads = num_threads
     # To ensure that the output files are named correctly, we need to remove the file extension from the input file. To eliminate "fq.gz" or ".fastq" etc, we split the basename by "." and take the first element
-    input_basename = os.path.basename(args.input).split(".")
+    input_dir, input_filename = os.path.split(os.path.abspath(args.input))
+    if input_dir == "":
+        input_dir = os.getcwd()
+    input_basename = input_filename.split(".")
     if len(input_basename) >=3:
         input_basename = ".".join(input_basename[:-2])
     else:
         input_basename = ".".join(input_basename[:-1])
+    # The path to the input file is split into the directory and the file name. The file name is then split into the name and the extension
+    
     num_workers = num_threads
     with xopen(args.input, mode="rb", threads=num_threads) as input_file:
         number_of_saved_reads = 0
@@ -132,7 +137,7 @@ def main():
                         open_flag[key] = True
                     else:
                         open_mode = "a"
-                    with dnaio.open(f"{input_basename}_{key}.{output_format}.gz", mode=open_mode, compression_level=args.compression_level, open_threads=dnaio_open_threads, fileformat=output_format) as output_handle:
+                    with dnaio.open(f"{input_dir}/{input_basename}_{key}.{output_format}.gz", mode=open_mode, compression_level=args.compression_level, open_threads=dnaio_open_threads, fileformat=output_format) as output_handle:
                         for record in result[key]:
                             output_handle.write(record)
                             number_of_saved_reads += 1
