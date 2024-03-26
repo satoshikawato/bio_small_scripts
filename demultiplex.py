@@ -107,19 +107,28 @@ def main():
     with xopen(args.input, mode="rb", threads=num_threads) as input_file:
         number_of_saved_reads = 0
         output_format = _detect_format_from_content(input_file)
+        open_flag = defaultdict(bool)  # Flag to track if an output file has been opened
+
         with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
-            # futures = [executor.submit(process_chunk, chunk.tobytes(), primers) for chunk in dnaio.read_chunks(input_file, buffer_size=4194304)] # does it wait until all chunks are read? the answer is yes. This is because we use a list comprehension to create the futures, and the list comprehension will not create the futures until the dnaio.read_chunks() generator is exhausted. To avoid this, we can use a for loop to create the futures and submit them to the executor as they are created.
             futures = []
             for chunk in dnaio.read_chunks(input_file, buffer_size=4194304):
                 future = executor.submit(process_chunk, chunk.tobytes(), primers)
                 futures.append(future)
+
             for future in concurrent.futures.as_completed(futures):
                 result = future.result()
                 for key in result.keys():
-                    with dnaio.open(f"{input_basename}_{key}.{output_format}.gz", mode="a", compression_level=args.compression_level, open_threads=dnaio_open_threads, fileformat=output_format) as output_handle:
+                    if not open_flag[key]:  # If the output file hasn't been opened yet
+                        open_mode = "w"  # Open in write mode
+                        open_flag[key] = True  # Set the flag to True
+                    else:
+                        open_mode = "a"  # Open in append mode
+
+                    with dnaio.open(f"{input_basename}_{key}.{output_format}.gz", mode=open_mode, compression_level=args.compression_level, open_threads=dnaio_open_threads, fileformat=output_format) as output_handle:
                         for record in result[key]:
                             output_handle.write(record)
                             number_of_saved_reads += 1
+
         logging.info(f"A total of {number_of_saved_reads} reads were saved")
 
 if __name__ == "__main__":
