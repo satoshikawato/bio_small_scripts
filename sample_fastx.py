@@ -16,7 +16,7 @@ logger = logging.getLogger()
 handler = logging.StreamHandler(sys.stdout)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def parse_arguments():
+def parse_arguments(raw_args=None):
     parser = argparse.ArgumentParser(description="Extract and filter FASTA/FASTQ entries by various criteria")
     parser.add_argument("-i", "--input", required=True, type=str, help="Input FASTA/FASTQ file (optionally gzipped)")
     parser.add_argument("-o", "--output", required=True, type=str, help="Output FASTA/FASTQ file (gzipped if ending with .gz)")
@@ -27,7 +27,7 @@ def parse_arguments():
     group = parser.add_mutually_exclusive_group()
     group.add_argument("-f", "--fraction", type=float, help="Fraction of reads to keep")
     group.add_argument("-n", "--num_reads", type=int, help="Number of reads to keep")
-    return parser.parse_args()
+    return parser.parse_args(raw_args)
 
 def get_ids(input_file):
     ids = set()
@@ -37,17 +37,25 @@ def get_ids(input_file):
 
 
 #
-def randomly_select_ids(ids, num_reads):
+def randomly_select_ids(ids, target_read_count):
     # return random.sample(ids, num_reads) # DeprecationWarning: Sampling from a set deprecated since Python 3.9 and will be removed in a subsequent version.
-    # if the number of reads to be selected is greater than the number of reads in the file, then return all the reads
-    if num_reads > len(ids):
+    # if the number of reads to be selected is greater than the number of reads in the file or less than 1, then return all the reads
+    if target_read_count > len(ids):
+        logging.info(f"Number of reads to keep is greater than the number of reads in the file. Keeping all reads.")
+        return ids
+    elif target_read_count < 1:
+        logging.info(f"Number of reads to keep is too small. Keeping all reads.")
         return ids
     else:
-        return random.sample(list(ids), num_reads)
+        return random.sample(list(ids), target_read_count)
 
 
 def determine_read_number_from_fraction(ids, fraction):
-    return int(len(ids) * fraction)
+    read_number = int(len(ids) * fraction)
+    if read_number < 1:
+        logging.info(f"Fraction {fraction} is too small. Keeping all reads.")
+        return len(ids)
+    return 
 
 
 def is_selected(record, selected_ids):
@@ -64,14 +72,14 @@ def process_chunk(input_chunk, selected_ids):
 
     return output_chunk
 
-def main():
-    args = parse_arguments()
-    logging.info(f"Filtering {args.input} and writing to {args.output}")
+def main(raw_args=None):
+    args = parse_arguments(raw_args)
+    logging.debug(f"Filtering {args.input} and writing to {args.output}")
     id_set = set()
     num_threads = args.num_threads
     if num_threads == 0:
         num_threads = os.cpu_count()
-        logging.info(f"Using {num_threads} threads")
+        logging.debug(f"Using {num_threads} threads")
     if num_threads == 1:
         dnaio_open_threads = 0
     else:
@@ -94,15 +102,15 @@ def main():
 
     logging.info(f"Read {len(id_set)} reads from {args.input}")
 
-
     if args.fraction:
-        number_of_saved_reads = determine_read_number_from_fraction(id_set, args.fraction)
-        selected_ids = randomly_select_ids(id_set, number_of_saved_reads)
+        target_read_count = determine_read_number_from_fraction(id_set, args.fraction)
+        selected_ids = randomly_select_ids(id_set, target_read_count)
     elif args.num_reads:
-        number_of_saved_reads = args.num_reads
-        selected_ids = randomly_select_ids(id_set, number_of_saved_reads)
+        target_read_count = args.num_reads
+        selected_ids = randomly_select_ids(id_set, target_read_count)
     else:
-        raise ValueError("Either --fraction or --num_reads must be given")
+        logging.info(f"Neither --fraction nor --num_reads was specified. Retaining all reads.")
+        selected_ids = id_set
     number_of_saved_reads = 0
     with xopen(args.input, mode="rb", threads=num_threads) as input_file:
         with dnaio.open(args.output, mode="w", compression_level=args.compression_level, open_threads=dnaio_open_threads, fileformat=output_format) as output_handle:
