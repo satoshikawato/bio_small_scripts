@@ -29,24 +29,26 @@ def parse_arguments(raw_args=None):
     parser.add_argument("-c", "--compression_level", type=int, default=3, help="Compression level for gzip output (default: 3)")
     return parser.parse_args(raw_args)
 
-def get_reverse_complement(sequence: str, qualities: str) -> Tuple[str, str]:
+def get_reverse_complement(sequence: str, qualities: str = None):
     out_sequence = sequence.translate(complement)[::-1]  # Reverse the sequence
-    out_quality = qualities[::-1]  # Reverse the quality scores
-    return out_sequence, out_quality
+    if qualities is None:
+        return out_sequence
+    else:
+        out_quality = qualities[::-1]  # Reverse the quality scores
+        return out_sequence, out_quality
 
-
-def filter_sequence(record, forward_primer, reverse_primer):
+def filter_sequence(record, forward_primer, reverse_primer, trim_primers=False):
     primer_sites = {}
 
     primer_f = forward_primer
     primer_f_rc = forward_primer.translate(complement)[::-1]
     forward_alignment = None
     reverse_alignment = None
-
-    forward_alignment = edlib.align(primer_f, record.sequence, mode="HW", task="path", additionalEqualities=[("R", "A"), ("R", "G")])
+    additional_equalities = [("R", "A"), ("R", "G"), ("Y", "C"), ("Y", "T"), ("S", "G"), ("S", "C"), ("W", "A"), ("W", "T"), ("K", "G"), ("K", "T"), ("M", "A"), ("M", "C"), ("B", "C"), ("B", "G"), ("B", "T"), ("V", "A"), ("V", "C"), ("V", "G"), ("D", "A"), ("D", "G"), ("D", "T"), ("H", "A"), ("H", "C"), ("H", "T"), ("N", "A"), ("N", "C"), ("N", "G"), ("N", "T")]
+    forward_alignment = edlib.align(primer_f, record.sequence, mode="HW", task="path", additionalEqualities=additional_equalities)
     if forward_alignment["editDistance"] >2:
         forward_alignment = None
-    reverse_alignment = edlib.align(primer_f_rc, record.sequence, mode="HW", task="path", additionalEqualities=[("R", "A"), ("R", "G")])
+    reverse_alignment = edlib.align(primer_f_rc, record.sequence, mode="HW", task="path", additionalEqualities=additional_equalities)
     if reverse_alignment["editDistance"] >2:
         reverse_alignment = None
     if forward_alignment != None and reverse_alignment != None:
@@ -76,15 +78,38 @@ def filter_sequence(record, forward_primer, reverse_primer):
         primer_sites["reverse"] = [forward_alignment, "forward"]
     elif reverse_alignment != None:
         primer_sites["reverse"] = [reverse_alignment, "reverse"]
-    
+    new_record = record
     if primer_sites["forward"][1] != primer_sites["reverse"][1]:
+        flag = "success"
         if primer_sites["forward"][0]["locations"][0][0] < primer_sites["reverse"][0]["locations"][0][1]:
-            pass
+            if trim_primers == True:
+                new_start = primer_sites["forward"][0]["locations"][0][1]+1
+                new_end = primer_sites["reverse"][0]["locations"][0][0]
+                new_record.sequence = record.sequence[new_start:new_end]
+                if record.qualities is not None:
+                    new_record.qualities = record.qualities[new_start:new_end]
+                else:
+                    pass
+            else:
+                pass
         elif primer_sites["forward"][0]["locations"][0][0] > primer_sites["reverse"][0]["locations"][0][1]:
-            record.sequence, record.qualities = get_reverse_complement(record.sequence, record.qualities)
-        return record, "success"
+            if trim_primers == True:
+                new_start = primer_sites["reverse"][0]["locations"][0][1]+1
+                new_end = primer_sites["forward"][0]["locations"][0][0]
+                new_record.sequence = record.sequence[new_start:new_end]
+                if record.qualities is not None:
+                    new_record.qualities = record.qualities[new_start:new_end]
+                result = get_reverse_complement(new_record.sequence, new_record.qualities if hasattr(new_record, "qualities") else None)
+                if isinstance(result, tuple):
+                    new_record.sequence, new_record.qualities = result
+                else:
+                    new_record.sequence = result
+            else:
+                new_record.sequence = get_reverse_complement(new_record.sequence)
+        return new_record, flag
     else:
-        return record, "failed"
+        flag = "failed"
+        return new_record, flag
 
 def process_chunk(input_chunk, forward_primer, reverse_primer):
     output_chunk = defaultdict(list)
@@ -98,12 +123,12 @@ def main(raw_args=None):
     args = parse_arguments(raw_args)
     forward_primer = args.fwd_seq
     reverse_primer = args.rev_seq
-    logging.info(f"Filtering {args.input}")
+    logging.debug(f"Filtering {args.input}")
     id_set = set()
     num_threads = args.num_threads
     if num_threads == 0:
         num_threads = os.cpu_count()
-        logging.info(f"Using {num_threads} threads")
+        logging.debug(f"Using {num_threads} threads")
     if num_threads == 1:
         dnaio_open_threads = 0
     else:
@@ -141,7 +166,7 @@ def main(raw_args=None):
                         for record in result[key]:
                             output_handle.write(record)
                             number_of_saved_reads += 1
-        logging.info(f"A total of {number_of_saved_reads} reads were saved")
+        logging.debug(f"A total of {number_of_saved_reads} reads were saved")
 
 if __name__ == "__main__":
     main()
