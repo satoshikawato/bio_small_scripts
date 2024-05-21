@@ -1,23 +1,14 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# Insprired and cannibalized from:
+# Basically rewrite of this:
 # Biopython Tutorial and Cookbook 20.1.13 Identifying open reading frames
 # http://biopython.org/DIST/docs/tutorial/Tutorial.html#sec384
-# Motivations:
-# 1. Allow overlaps
-# 2. Output in GFF3
-# 3. Customizability
-
 
 import sys
-import os
 import argparse
-from collections import defaultdict
 from Bio import SeqIO
-from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from Bio.SeqFeature import SeqFeature, FeatureLocation
 
 
 def get_args():
@@ -55,6 +46,10 @@ def get_args():
         help='minimum protein length (default: 50)',
         type=int,
         default='50')
+    parser.add_argument(
+        '--keep_nested',
+        action='store_true',
+        help='keep nested ORFs (default: False)')
     args = parser.parse_args()
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
@@ -66,15 +61,30 @@ def fasta_to_records(in_fa):
     seq_records = [record for record in SeqIO.parse(in_fa, 'fasta')]
     return seq_records
 
-
-def get_orf(record, trans_table, min_protein_length):
+def remove_nested_orfs(orf_list):
+    non_nested_orfs = []
+    for i in range(len(orf_list)):
+        is_nested = False
+        for j in range(len(orf_list)):
+            if i != j:
+                if orf_list[i][0] >= orf_list[j][0] and orf_list[i][1] <= orf_list[j][1]:
+                    is_nested = True
+                    break
+        if not is_nested:
+            non_nested_orfs.append(orf_list[i])
+    return non_nested_orfs
+    
+def get_orf(record, trans_table, min_protein_length, keep_nested):
     orf_list = []
     prefix = record.id
     seq = record.seq
     seq_len = len(seq)
     for strand, nuc in [(+1, seq), (-1, seq.reverse_complement())]:
         for frame in range(3):
-            trans = nuc[frame:].translate(trans_table)
+            nuc_frame = nuc[frame:]
+            if len(nuc_frame) % 3 != 0:
+                nuc_frame = nuc_frame[:-(len(nuc_frame) % 3)]
+            trans = nuc_frame.translate(trans_table)
             trans_len = len(trans)
             aa_start = 0
             aa_end = 0
@@ -97,11 +107,14 @@ def get_orf(record, trans_table, min_protein_length):
                 aa_start = trans.find("M", aa_end + 1)
                 if aa_start < 0:
                     break
+    if not keep_nested:
+        orf_list = remove_nested_orfs(orf_list)
     orf_list.sort()
+    zfill_len = int(len(str(len(orf_list)))+1)
     count = 0
     for orf in orf_list:
         count += 1
-        orf_id = "{}_{}".format(prefix, str(count).zfill(3))
+        orf_id = "{}_{}".format(prefix, str(count).zfill(zfill_len))
         orf.insert(0, orf_id)
     return orf_list
 
@@ -133,7 +146,6 @@ def get_gff3_features(orf_dict):
             seqid = key
             source = "orfind.py"
             score = "."
-            attributes = []
             feature_type = "CDS"
             start = int(orf[1]) + 1
             end = int(orf[2])
@@ -158,14 +170,15 @@ def main():
     out_fna = args.out_fna
     trans_table = args.trans_table
     min_protein_length = args.min_aa_len
+    keep_nested = args.keep_nested
     header = "##gff-version  3"
     comments = ''
     comments += '{}\n'.format(header)
-    feature_dict = {}
     orf_dict = {}
+
     for record in records:
         record_id = record.id
-        orf_dict[record_id] = get_orf(record, trans_table, min_protein_length)
+        orf_dict[record_id] = get_orf(record, trans_table, min_protein_length, keep_nested)
     gff3_features = get_gff3_features(orf_dict)
     if out_gff3:
         with open(out_gff3, "w") as f:
