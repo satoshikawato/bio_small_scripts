@@ -2,213 +2,158 @@
 # coding: utf-8
 
 import sys
-import os
 import argparse
 from collections import defaultdict
+import csv
+from typing import List, Dict, Tuple
 
 
-def get_args():
+def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description='add functional annotation to the 9th column of a gff3 file')
+        description='Add functional annotation to the 9th column of a GFF3 file')
     parser.add_argument(
-        '-g',
-        '--gff',
-        help='Annotation in gff3 format (required)',
-        type=str,
-        required=True)
+        '-g', '--gff', help='Annotation in GFF3 format (required)', type=str, required=True)
     parser.add_argument(
-        '-b',
-        '--blast',
-        help='tab-separated blast output (required) with "-outfmt "[6|7] qaccver saccver pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen qcovs""',
-        type=str,
-        required=True)
+        '-b', '--blast', help='Tab-separated BLAST output (required) with "-outfmt "[6|7] qaccver saccver pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen qcovs""', type=str, required=True)
     parser.add_argument(
-        '-f',
-        '--func',
-        help='tab-separated function table (required)',
-        type=str,
-        required=True)
+        '-f', '--func', help='Tab-separated function table (required)', type=str, required=True)
     parser.add_argument(
-        '-o',
-        '--out',
-        help='Annotation in gff3 format (default: stdout)',
-        type=str)
+        '-o', '--out', help='Annotation in GFF3 format (default: stdout)', type=str)
     parser.add_argument(
-        '-p',
-        '--prefix',
-        help='locus ID prefix (default: gene)',
-        type=str,
-        default='gene')
+        '-p', '--prefix', help='Locus ID prefix (default: gene)', type=str, default='gene')
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
-def read_gff(in_gff):
+def read_gff(gff_file: str, min_cds_len: int = 75, min_confidence: int = 70) -> Tuple[str, List[List[str]]]:
     '''
-    Read a gff3 file.
-    Features shorter than 75 nt or confidence lower than 70 are discarded.
-    Returns: comment lines and feature lines.
-
-    Also see:
-    GFF3 File Format - Definition and supported options (http://gmod.org/wiki/GFF3)
+    Read a GFF3 file.
+    Features shorter than min_cds_len or confidence lower than min_confidence are discarded.
+    Returns comment lines and feature lines.
     '''
     comments = ''
     features = []
-    min_cds_len = 75
-    with open(in_gff) as f:
+    with open(gff_file) as f:
         for line in f:
             line = line.rstrip()
             if line.startswith('#'):
-                comments += '{}\n'.format(line)
+                comments += f'{line}\n'
             else:
                 feature = line.split('\t')
                 attributes = feature[8].split(';')
                 attributes = list(filter(None, attributes))
                 tags = dict([tmp.split('=') for tmp in attributes])
-                feat_len = (int(feature[4]) - int(feature[3]) + 1)
+                feat_len = int(feature[4]) - int(feature[3]) + 1
                 feature[8] = tags
                 features.append(feature)
     return comments, features
 
+def tbl_to_dict(function_table: str) -> Dict[str, Tuple[str, str]]:
+    '''
+    Read a two-column or three-column, tab-delimited table.
+    Returns a dictionary (key: left; value: tuple of middle and right columns (if available)).
+    '''
+    func_dict = {}
+    with open(function_table) as f:
+        for row in csv.reader(f, delimiter='\t'):
+            if len(row) == 2:
+                func_dict[row[0]] = (row[1], "")
+            elif len(row) == 3:
+                func_dict[row[0]] = (row[1], row[2])
+    return func_dict
 
-def tbl_to_dict(in_table):
-    '''
-    Read a two-column, tab-delimited table.
-    Returns a dictionary (key: left; value: right).
-    '''
-    out_dict = {}
-    with open(in_table) as f:
-        for line in f:
-            line = line.rstrip().split('\t')
-            out_dict[line[0]] = line[1]
-    return out_dict
 
 
-def blast_to_dict(blast_out):
+def blast_to_dict(blast_output: str, evalue_cutoff: float = 1e-2, min_identity: float = 80) -> Dict[str, List[List[str]]]:
     '''
-    Read a tab-delimited blast output (-outfmt 6 or 7).
-    Comment lines removed automatically.
-    Returns a dictionary (key: query; value: whole line, tab-delimited).
+    Read a tab-delimited BLAST output (-outfmt 6 or 7).
+    Comment lines are removed automatically.
+    Returns a dictionary (key: query; value: list of BLAST hits).
     '''
-    blast_out_dict = defaultdict(list)
-    with open(blast_out) as f:
-        for line in f:
-            line = line.rstrip()
-            if line.startswith('#'):
+    blast_dict = defaultdict(list)
+    with open(blast_output) as f:
+        for row in csv.reader(f, delimiter='\t'):
+            if row[0].startswith('#'):
                 continue
-            else:
-                line = line.split('\t')
-                cds_id = line[0]
-                if (float(line[2]) < 80) or (
-                        float(line[10]) > 1e-2) or (float(line[11]) < 80):
-                    continue
-                else:
-                    blast_out_dict[cds_id].append(line)
-    return blast_out_dict
+            if float(row[2]) < min_identity or float(row[10]) > evalue_cutoff:
+                continue
+            blast_dict[row[0]].append(row)
+    return blast_dict
 
 
-def judge_overlaps(retained_hits):
+def select_best_hits(hits: List[List[str]]) -> Tuple[str, List[str]]:
     '''
-
-    1)  The subject name is assigned that covers 80% or more of the query.
-        Multiple hits are ranked based on s_cov (subject coverage), which favors the CDS of the closest length over longer/shorter ones.
-        If the query length is less than 80% of the selected subject length, the query is regarded as truncated.
-
-    2)  If none of the subjects cover 80% of the query, multiple hits are concatenated with hyphen (-) to denote a fusion gene.
-
-    Returns a CDS name.
-
+    Select the best BLAST hits based on query coverage and subject coverage.
+    Returns the CDS name and a list of notes.
     '''
-    hits2 = {}
-    hits2_over80 = {}
-    hits2_under80 = []
-    cds_note_list = []
-    for hit in retained_hits:
-        hit_dict = {}
-        aln_len = int(hit[3])
-        q_start = int(hit[6])
-        q_end = int(hit[7])
-        q_len = int(hit[12])
-        s_len = int(hit[13])
-        hit_dict["aln_len"] = aln_len
-        hit_dict["q_start"] = q_start
-        hit_dict["q_end"] = q_end
-        hit_dict["q_len"] = q_len
-        hit_dict["s_len"] = s_len
-        hit_dict["evalue"] = float(hit[10])
-        hit_dict["q_cov"] = float(100 * (aln_len / q_len))
-        hit_dict["s_cov"] = float(100 * (aln_len / s_len))
-        hit_dict["s_cov_ratio"] = float(100 * (q_len / s_len))
-        hits2[hit[1]] = hit_dict
-
-    hits2_under80 = []
-
-    for key in hits2.keys():
-        if hits2[key]['q_cov'] > 80:
-            hits2_over80[key] = hits2[key]
+    hits_over_80 = {}
+    hits_under_80 = []
+    for hit in hits:
+        aln_len, q_start, q_end, q_len, s_len = map(int, [hit[3], hit[6], hit[7], hit[12], hit[13]])
+        q_cov = 100 * (aln_len / q_len)
+        s_cov = 100 * (aln_len / s_len)
+        s_cov_ratio = 100 * (q_len / s_len)
+        if q_cov > 80:
+            hits_over_80[hit[1]] = {'aln_len': aln_len, 'q_start': q_start, 'q_end': q_end,
+                                    'q_len': q_len, 's_len': s_len, 'evalue': float(hit[10]),
+                                    'q_cov': q_cov, 's_cov': s_cov, 's_cov_ratio': s_cov_ratio}
         else:
-            hits2_under80.append(key)
+            hits_under_80.append(hit[1])
 
-    if len(hits2_over80) > 0:
-        cds_kept = max(hits2_over80, key=lambda x: hits2_over80[x]['s_cov'])
-        cds_name = "{}".format(cds_kept)
-        if hits2_over80[cds_kept]['s_cov'] < 80:
-            cds_note_list.append("{}, truncated".format(cds_name))
+    notes = []
+    if hits_over_80:
+        cds_kept = max(hits_over_80, key=lambda x: hits_over_80[x]['s_cov'])
+        cds_name = cds_kept
+        if hits_over_80[cds_kept]['s_cov'] < 80:
+            notes.append(f"{cds_name}%3Btruncated")
         else:
-            cds_note_list.append("{}".format(cds_name))
+            notes.append(cds_name)
     else:
-        if len(hits2_under80) > 1:
-            cds_name = "-".join(hits2_under80)
-            cds_note_list.append("{}, chimeric".format(cds_name))
-        elif len(hits2_under80) == 1:
-            cds_name = "-".join(hits2_under80)
-            cds_note_list.append(cds_name)
+        if len(hits_under_80) > 1:
+            cds_name = "-".join(hits_under_80)
+            notes.append(f"{cds_name}%3Bchimeric")
+        elif len(hits_under_80) == 1:
+            cds_name = "-".join(hits_under_80)
+            notes.append(cds_name)
         else:
-            cds_note_list.append("hypothetical protein")
-    return cds_name, cds_note_list
+            cds_name = ""
+            notes.append("hypothetical protein")
+    return cds_name, notes
 
 
-def add_func_to_cds(features, blast_dict, func_tbl, prefix):
+def add_func_to_cds(features: List[List[str]], blast_dict: Dict[str, List[List[str]]],
+                    func_tbl: Dict[str, Tuple[str, str]], prefix: str) -> str:
     '''
-    Add annotation to the 9th column of the gff3 file.
+    Add annotation to the 9th column of the GFF3 file.
     Discards CDS if no significant hits to target sequences.
+    Returns the updated GFF3 features as a string.
     '''
     out_features = ''
     new_count = 0
     for feature in features:
         if 'CDS' in feature[2]:
             qualifiers = feature[8]
-            new_qualifiers = defaultdict(list)
-            if qualifiers["ID"] in blast_dict.keys():
-                cds_name, cds_note_list = judge_overlaps(
-                    blast_dict[qualifiers["ID"]])
-                new_count += 1
-                new_id = "{}_{}".format(prefix, str(new_count).zfill(3))
-                new_qualifiers["ID"] = new_id
-                for note in cds_note_list:
-                    new_qualifiers["note"].append(note)
-                if cds_name in func_tbl.keys():
-                    new_qualifiers["product"] = func_tbl[cds_name]
-                else:
-                    new_qualifiers["product"] = "hypothetical protein"
-            else:
-                continue
-            note_strs = ""
-            for note in new_qualifiers["note"]:
-                note_strs += "note={};".format(note)
-            out_qualifiers = "{}product={};".format(
-                note_strs, new_qualifiers["product"])
-            out_feature_line = feature[0:8]
-            out_feature_line.append(out_qualifiers)
-            out_feature_line = '\t'.join(out_feature_line)
-            out_features += '{}\n'.format(out_feature_line)
+            if qualifiers["ID"] in blast_dict:
+                cds_name, notes = select_best_hits(blast_dict[qualifiers["ID"]])
+                if cds_name:
+                    new_count += 1
+                    new_id = f"{prefix}_{str(new_count).zfill(3)}"
+                    product, note = func_tbl.get(cds_name, ("hypothetical protein", ""))
+                    if note:
+                        notes.append(note.replace(";", "%3B"))
+                    note_strs = "%3B".join(f"{note}" for note in notes)
+                    out_qualifiers = f"ID={new_id};note={note_strs};product={product}"
+                    out_feature_line = "\t".join(feature[:8] + [out_qualifiers])
+                    out_features += f'{out_feature_line};\n'
     return out_features
 
 
-def main():
+def main() -> None:
+    '''
+    Main function to run the script.
+    '''
     args = get_args()
     comments, features = read_gff(args.gff)
     func_tbl = tbl_to_dict(args.func)
@@ -218,8 +163,8 @@ def main():
     out_features = add_func_to_cds(features, blast_dict, func_tbl, prefix)
     if out_file:
         with open(out_file, "w") as f:
-            print(comments, file=f, end='')
-            print(out_features, file=f, end='')
+            f.write(comments)
+            f.write(out_features)
     else:
         print(comments, end='')
         print(out_features, end='')
