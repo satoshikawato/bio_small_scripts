@@ -4,7 +4,7 @@
 import sys
 import logging
 import argparse
-
+import csv
 # Setup the logging system. Configures a stream handler to output log messages to stdout.
 # Default logging level is set to INFO.
 logger = logging.getLogger()
@@ -12,16 +12,36 @@ handler = logging.StreamHandler(sys.stdout)
 
 
 class PafLine:
-    def __init__(self, paf_line):
-        self.fields = paf_line.strip().split('\t')
+    def __init__(self, paf_line, format):
+        self.fields = paf_line
+        self.ani = None
+        self.kmer_complexity = None
         self.query_name, self.query_length, self.query_start, self.query_end, self.relative_strand, self.target_name, self.target_length, self.target_start, self.target_end, self.num_residue_matches, self.block_length, self.mapping_quality, *_ = self.fields
+        if format == "mashmap" and len(self.fields) > 12:
+            self.ani = self.fields[12].replace("id:f:", "")
+            self.kmer_complexity = self.fields[13].replace("kc:f:", "")
+            
+def parse_fields(field_input):
+    if field_input == 'all':
+        return list(range(1, 13))  # Return all fields (1 to 12)
+    
+    fields = []
+    for field_range in field_input.split(','):
+        if '-' in field_range:
+            start, end = field_range.split('-')
+            fields.extend(range(int(start), int(end) + 1))
+        else:
+            fields.append(int(field_range))
+    
+    return fields
 
 
-def arg_parser():
+def arg_parser(raw_args=None):
     parser = argparse.ArgumentParser(description='Process PAF file and target reference list.')
     parser.add_argument('-i', '--input', help='Path to the PAF file')
     parser.add_argument('-t', '--target', help='Path to the target reference list file')
     parser.add_argument('-o', '--output', help='Path to the output file')
+    parser.add_argument('-f', '--format', help='input format (miniamp2 or mashmap)', choices=['minimap2', 'mashmap'], default='minimap2')
     parser.add_argument('-s', '--relative_strand', help='Relative strand ("plus", "minus", "both")', choices=['plus', 'minus', 'both'], default='both')
     parser.add_argument('-m', '--min_query_length', help='Minimum query length', type=int, default=0)
     parser.add_argument('-M', '--max_query_length', help='Maximum query length', type=int, default=None)
@@ -33,6 +53,8 @@ def arg_parser():
     parser.add_argument('-Q', '--maximum_mapping_quality', help='Maximum mapping quality', type=int, default=None)
     parser.add_argument('--min_identity', help='Minimum nucleotide identity (0-1)', type=float, default=0.0)
     parser.add_argument('--max_identity', help='Maximum nucleotide identity (0-1)', type=float, default=None)
+    parser.add_argument('--min_kmer_complexity', help='Minimum kmer complexity (0-1)', type=float, default=0.0)
+    parser.add_argument('--max_kmer_complexity', help='Maximum kmer complexity (0-1)', type=float, default=None)
     parser.add_argument('--min_query_target_ratio', help='Minimum query to target length ratio (0-1)', type=float, default=0.0)
     parser.add_argument('--max_query_target_ratio', help='Maximum query to target length ratio (0-1)', type=float, default=None)
     parser.add_argument('--min_block_query_ratio', help='Minimum block to query length ratio (0-1)', type=float, default=0.0)
@@ -43,28 +65,20 @@ def arg_parser():
     parser.add_argument('--maximum_residue_matches', help='Maximum residue matches', type=int, default=None)
     parser.add_argument('--max_left_overhang', help='Maximum left overhang (0-1)', type=float, default=None)
     parser.add_argument('--max_right_overhang', help='Maximum right overhang (0-1)', type=float, default=None)
-    return parser.parse_args()
+    #parser.add_argument('--field', type=parse_fields, help='field(s) to output (e.g., "1,3,5", "1-5", "all")', default='1')
+    args = parser.parse_args(raw_args)
+    return args
 
 
-def read_paf(in_file):
+def read_paf(in_file, format):
     with open(in_file, "r") as f:
-        return [PafLine(line) for line in f]
+        reader = csv.reader(f, delimiter='\t')
+        #return [row[0] for row in reader if row]
+        return [PafLine(row, format) for row in reader if row]
 
-def meet_identity_thresholds(paf_line, min_identity, max_identity):
-    nucleotide_identity = int(paf_line.num_residue_matches) / int(paf_line.block_length)
-    if max_identity is None:
-        return min_identity <= nucleotide_identity
-    return min_identity <= nucleotide_identity <= max_identity
 
-def meet_min_identity_thresholds(paf_line, min_identity):
-    if min_identity is None:
-        return True
-    return int(paf_line.num_residue_matches) / int(paf_line.block_length) >= min_identity
 
-def meet_max_identity_thresholds(paf_line, max_identity):
-    if max_identity is None:
-        return True
-    return int(paf_line.num_residue_matches) / int(paf_line.block_length) <= max_identity
+
 
 def meet_min_block_length_thresholds(paf_line, min_block_length):
     if min_block_length is None:
@@ -163,6 +177,15 @@ def meet_max_right_overhang_thresholds(paf_line, max_right_overhang):
     if max_right_overhang is None:
         return True
     return right_overhang <= max_right_overhang
+
+def meet_identity_thresholds(paf_line, min_identity, max_identity, format_type):
+    if format_type == "mashmap":
+        nucleotide_identity = float(paf_line.ani)
+    else:
+        nucleotide_identity = int(paf_line.num_residue_matches) / int(paf_line.block_length)
+    if max_identity is None:
+        return min_identity <= nucleotide_identity
+    return min_identity <= nucleotide_identity <= max_identity
 
 def meet_block_length_thresholds(paf_line, min_block_length, max_block_length):
     if all([
@@ -271,6 +294,10 @@ def filter_paf(paf_lines, args, targets):
     relative_strand = args.relative_strand
     min_query_target_ratio = args.min_query_target_ratio
     max_query_target_ratio = args.max_query_target_ratio
+    min_kmer_complexity = args.min_kmer_complexity
+    max_kmer_complexity = args.max_kmer_complexity
+    format_type = args.format
+    filtered_lines = []
     filtered_query_names = []
     for paf_line in paf_lines:
         # to check if the paf line meets all the conditions (if defined), add paf_line to filtered_query_names.
@@ -278,7 +305,7 @@ def filter_paf(paf_lines, args, targets):
         # To do so, we will use the all() function to check if all the conditions are met.
         conditions = [
             ("is_a_target", is_a_target(paf_line, targets)),
-            ("meet_identity_thresholds", meet_identity_thresholds(paf_line, min_nucleotide_identity, max_nucleotide_identity)),
+            ("meet_identity_thresholds", meet_identity_thresholds(paf_line, min_nucleotide_identity, max_nucleotide_identity, format_type)),
             ("meet_block_length_thresholds", meet_block_length_thresholds(paf_line, min_block_length, max_block_length)),
             ("meets_query_length_thresholds", meets_query_length_thresholds(paf_line, min_query_length, max_query_length)),
             ("meet_target_length_thresholds", meet_target_length_thresholds(paf_line, min_target_length, max_target_length)),
@@ -294,13 +321,14 @@ def filter_paf(paf_lines, args, targets):
         if all([condition[1] for condition in conditions]): # condition[1] is the value of the condition. condition[0] is the name of the condition.
             filtered_query_names.append(paf_line.query_name)
     filtered_query_names = list(set(filtered_query_names))
-
     return filtered_query_names
 
 
 def read_lines(file_path):
     with open(file_path, 'r') as file:
-        return [line.strip() for line in file]
+        reader = csv.reader(file, delimiter='\t')
+        return [row[0] for row in reader if row]
+        #return [line.strip().split("\t")[0] for line in file]
 
 
 def collate_references(paf_references, target_references):
@@ -317,21 +345,21 @@ def save_query_ids(query_ids, output_file):
             file.write(query_id + '\n')
 
 
-def main():
-    args = arg_parser()
+def main(raw_args=None):
+    args = arg_parser(raw_args)
 
     paf_file = args.input
     target_file = args.target
     output_file = args.output
+    format = args.format
     if target_file:
         targets = read_lines(target_file)
     else:
         targets = None
-    paf_file = read_paf(paf_file)
-    
-    query_ids = filter_paf(paf_file, args, targets)
+    paf_lines = read_paf(paf_file, format)
+    query_ids = filter_paf(paf_lines, args, targets)
     save_query_ids(query_ids, output_file)
-
+    
 
 if __name__ == '__main__':
     main()

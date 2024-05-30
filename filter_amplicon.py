@@ -127,6 +127,10 @@ def filter_sequence(record, forward_primer, reverse_primer, trim_option, max_edi
                     new_record.sequence = result                
             else:
                 result = get_reverse_complement(new_record.sequence, new_record.qualities if hasattr(new_record, "qualities") else None)
+                if isinstance(result, tuple):
+                    new_record.sequence, new_record.qualities = result
+                else:
+                    new_record.sequence = result 
         return new_record, flag
     else:
         flag = "failed"
