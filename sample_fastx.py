@@ -21,12 +21,15 @@ def parse_arguments(raw_args=None):
     parser.add_argument("-i", "--input", required=True, type=str, help="Input FASTA/FASTQ file (optionally gzipped)")
     parser.add_argument("-o", "--output", required=True, type=str, help="Output FASTA/FASTQ file (gzipped if ending with .gz)")
     parser.add_argument("-t", "--num_threads", type=int, default=0, help="Number of threads to use (default: use all available cores)")
-    parser.add_argument("-c", "--compression_level", type=int, default=6, help="Compression level for gzip (default: 6)")
+    parser.add_argument("-c", "--compression_level", type=int, default=3, help="Compression level for gzip (default: 3)")
     
     # the following arguments are mutually exclusive. To do so, we can use the add_mutually_exclusive_group() method
     group = parser.add_mutually_exclusive_group()
     group.add_argument("-f", "--fraction", type=float, help="Fraction of reads to keep")
     group.add_argument("-n", "--num_reads", type=int, help="Number of reads to keep")
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
     return parser.parse_args(raw_args)
 
 def get_ids(input_file):

@@ -34,6 +34,9 @@ def parse_arguments(raw_args=None):
     parser.add_argument("-c", "--compression_level", type=int, default=3, help="Gzip compression level (1-9)")
     parser.add_argument("-t", "--num_threads", type=int, default=1, help="Number of threads to use for parallel processing")
     parser.add_argument("--reverse_complement", action="store_true", help="Reverse complement the sequence")
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
     return parser.parse_args(raw_args)
 
 

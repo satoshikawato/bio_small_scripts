@@ -31,6 +31,9 @@ def parse_arguments(raw_args=None):
     trim_group = parser.add_mutually_exclusive_group()
     trim_group.add_argument("--trim_primers", action="store_true", help="Trim primers from the sequences (default: False)")
     trim_group.add_argument("--trim_trailing", action="store_true", help="Trim upstream/downstream bases from the sequences (default: False)")
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
     return parser.parse_args(raw_args)
 
 def get_reverse_complement(sequence: str, qualities: str = None):
