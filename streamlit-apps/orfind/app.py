@@ -237,7 +237,7 @@ codon_table_ids = list(CodonTable.generic_by_id.keys())  # List of table IDs
 # === Streamlit UI ===
 st.title("🧬 ORFIND v0.1.0")
 
-uploaded_file = st.file_uploader("Upload FASTA file", type=["fa", "fasta"])
+uploaded_file = st.file_uploader("Upload FASTA file")
 
 # Get basename for output files
 if uploaded_file:
@@ -257,22 +257,24 @@ keep_nested = st.checkbox("Retain nested ORFs", value=False)
 if st.button("Run") and uploaded_file:
     with st.spinner("Predicting ORFs..."):
         fasta_text = uploaded_file.getvalue().decode("utf-8")
-
-        # Fetch cached ORF predictions if available
-        gff3_bytes, faa_bytes, fna_bytes, gff3_str, orf_count = predict_orfs(
-            _fasta_text=fasta_text,
-            trans_table=trans_table,
-            min_protein_length=min_len,
-            keep_nested=keep_nested
-        )
-
-        st.session_state.gff3_bytes = gff3_bytes
-        st.session_state.faa_bytes = faa_bytes
-        st.session_state.fna_bytes = fna_bytes
-        st.session_state.gff3_str = gff3_str
-        st.session_state.orf_count = orf_count
-
-        st.success(f"Done! Found a total of {orf_count} ORFs.")
+        if not fasta_text.lstrip().startswith(">"):
+            st.error("❌ The uploaded file does not appear to be a valid FASTA file.")
+        else:
+            # Fetch cached ORF predictions if available
+            gff3_bytes, faa_bytes, fna_bytes, gff3_str, orf_count = predict_orfs(
+                _fasta_text=fasta_text,
+                trans_table=trans_table,
+                min_protein_length=min_len,
+                keep_nested=keep_nested
+            )
+    
+            st.session_state.gff3_bytes = gff3_bytes
+            st.session_state.faa_bytes = faa_bytes
+            st.session_state.fna_bytes = fna_bytes
+            st.session_state.gff3_str = gff3_str
+            st.session_state.orf_count = orf_count
+    
+            st.success(f"Done! Found a total of {orf_count} ORFs.")
 
 # === Download Output Files ===
 st.subheader("📄 Output files")
