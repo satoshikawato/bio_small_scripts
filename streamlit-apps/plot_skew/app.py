@@ -142,7 +142,7 @@ def main():
         draw_plot(record, df)
 
 # === Streamlit UI ===
-st.title("Dinucleotide Skew Plotter v0.1.0")
+st.title("SkewPlot v0.1.0")
 
 uploaded_file = st.file_uploader("Upload FASTA file")
 nt = st.text_input("Dinucleotide (e.g. GC, AT)", value="GC")
