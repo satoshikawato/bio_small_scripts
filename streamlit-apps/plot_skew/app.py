@@ -145,11 +145,10 @@ def main():
 st.title("SkewPlot v0.1.0")
 
 uploaded_file = st.file_uploader("Upload FASTA file")
-nt = st.text_input("Dinucleotide (e.g. GC, AT)", value="GC")
 # Window and step size inputs
 col1, col2, col3 = st.columns(3)
 with col1:
-    nt = st.text_input("Dinucleotide", value="GC")
+    nt = st.text_input("Dinucleotide (e.g. GC, AT)", value="GC")
 with col2:
     window = st.number_input("Window size", min_value=10, value=1000)
 with col3:
