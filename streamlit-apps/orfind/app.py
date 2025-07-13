@@ -288,3 +288,11 @@ if 'fna_bytes' in st.session_state:
     st.text_area("FNA Output", st.session_state.fna_bytes.getvalue().decode("utf-8"), height=300)
     st.download_button("Download CDSs (FNA)", st.session_state.fna_bytes,
                 file_name=fna_name, mime="text/plain")
+
+
+st.markdown("---")
+st.markdown(
+    "Author: [Satoshi Kawato](https://github.com/satoshikawato)  |  "
+    "Source: [bio_small_scripts](https://github.com/satoshikawato/bio_small_scripts)",
+    unsafe_allow_html=True
+)
