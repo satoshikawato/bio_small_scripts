@@ -1,5 +1,5 @@
-biopython
 streamlit
+biopython
 svgwrite
 pandas
 cairosvg
