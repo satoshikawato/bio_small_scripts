@@ -79,7 +79,7 @@ def check_start_end_coords(
         start,
         end,
         gap_character):
-    ref_record_len_gap_exclusive = len(ref_record.seq.ungap(gap_character))
+    ref_record_len_gap_exclusive = len(ref_record.seq.replace(gap_character, ""))
     if start < 1:
         start = 1
     if end > ref_record_len_gap_exclusive:
@@ -160,6 +160,17 @@ def make_start_end_dict(records, residue_dict, start, end):
         start_end_dict[record.id] = (name_space, start_loc, end_loc)
     return start_end_dict
 
+def residue_to_column_map(ref_record, gap_character, gap_inclusive):
+    residue_to_col = {}
+    col = 0
+    pos = 1  # 1-based coord of ref
+    for base in ref_record.seq:
+        if gap_inclusive or base != gap_character:
+            residue_to_col[pos] = col
+            pos += 1
+        col += 1
+    return residue_to_col
+
 def define_preceding_residues(
         records,
         ref_name,
@@ -168,24 +179,22 @@ def define_preceding_residues(
         end,
         gap_character,
         gap_inclusive):
-    preceding_residues = defaultdict(dict)
+    preceding_residues = defaultdict(int)
     if ref_name is not None:
         start, end = check_start_end_coords(
-            ref_record, start, end, gap_character, gap_inclusive)
-        residue_dict = residue_count(ref_record, gap_character, gap_inclusive)
-        aln_out = records[:, residue_dict[start]:residue_dict[end] + 1]
-        aln_preceding = records[:, :residue_dict[start] - 1]
+            ref_record, start, end, gap_character)
+        residue_to_col = residue_to_column_map(ref_record, gap_character, gap_inclusive)
+        aln_start = residue_to_col[start]
+        aln_end = residue_to_col[end]
+        aln_out = records[:, aln_start:aln_end + 1]
+        aln_preceding = records[:, :aln_start]
     else:
-        start, end = 1, len(ref_record.seq)
-        aln_preceding = records[:, 0:0]
         aln_out = records
-    for record in aln_preceding:
-        if ref_name is not None:
-            preceding_residues[record.id] = (len(record.seq.replace(gap_character, "")) + 2)
-        else:
-            preceding_residues[record.id] = (len(record.seq.replace(gap_character, "")) + 1)
-    return aln_out, preceding_residues
+        aln_preceding = records[:, 0:0]
 
+    for record in aln_preceding:
+        preceding_residues[record.id] = len(record.seq.replace(gap_character, "")) + 1
+    return aln_out, preceding_residues
 def print_records(records, start, end, wrap, preceding_residues, gap_character):
     count = 0
     residues = get_residues(records)
@@ -201,19 +210,20 @@ def print_records(records, start, end, wrap, preceding_residues, gap_character):
         chunk_seq_len[key] = preceding_residues[key]
     for chunk in range(0, num_chunks):
         residues = residues_chunks[chunk]
-        residue_group = add_conservation(residues)
-        print(residue_group)
         record_chunk = record_chunks[chunk]
         for record in record_chunk:
             count += 1
             chunk_seq_len[record.id] += len(record.seq.replace(gap_character, ""))
-            start = (chunk_seq_len[record.id] - len(record.seq.replace(gap_character, "")))
             if len(record.seq.replace(gap_character, "")) == 0:
-                end = start
+                start_pos = int(chunk_seq_len[record.id] - 1)
+                end_pos = start_pos
             else:
-                end = (chunk_seq_len[record.id] - 1)
+                start_pos = (chunk_seq_len[record.id] - len(record.seq.replace(gap_character, "")))
+                end_pos = (chunk_seq_len[record.id] - 1)
             record_group = make_text(record, start, end)
             print(record_group)
+        residue_group = add_conservation(residues)
+        print(residue_group)
         print()
 
 def main():
