@@ -6,6 +6,16 @@ See [here](https://qiita.com/satoshi_kawato) (in Japanese) for the details and m
 2023-12-21: `plot_linear_genome.py` and `plot_circular_genome.py` will be merged into a single package, which will be made public soon.
 
 2024-01-22: our new genome drawer [gbdraw](https://github.com/satoshikawato/gbdraw)  will be released soon!
+
+May 2025: [gbdraw](https://github.com/satoshikawato/gbdraw) is available from [bioconda](https://bioconda.github.io/recipes/gbdraw/README.html)!
+
+## Streamlit apps
+Some of the scripts have been made available as streamlit web apps!
+
+[ORFIND](https://orfind.streamlit.app/): A lightweight open reading frame (ORF) finder
+
+[SkewPlot](https://skewplot.streamlit.app/): Visualize dinucleotide skew (e.g. GC skew) in microbial genomes
+
 ## blast2bed.py
 convert BLASTN/BLASTX/TBLASTX output into BED format
 ## Requirements
