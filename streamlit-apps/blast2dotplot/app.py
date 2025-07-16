@@ -356,6 +356,7 @@ if st.session_state.svg_bytes:
 st.markdown("---")
 st.markdown(
     "Author: [Satoshi Kawato](https://github.com/satoshikawato)  |  "
-    "Source: [bio_small_scripts](https://github.com/satoshikawato/bio_small_scripts)",
+    "Source: [bio_small_scripts](https://github.com/satoshikawato/bio_small_scripts)  |  "
+    "Blog post: [Qiita](https://qiita.com/satoshi_kawato/items/0e5c13621e53bad8d9a0)",
     unsafe_allow_html=True
 )
