@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import base64
 from Bio.Blast import NCBIXML
 from io import StringIO, BytesIO
 from svgwrite import Drawing
@@ -7,7 +8,7 @@ from svgwrite.container import Group
 from svgwrite.shapes import Line
 from svgwrite.path import Path
 from svgwrite.text import Text
-import cairosvg
+
 
 def draw_hits(df, query_len, subject_len, total_width, total_height):
     hit_group = Group(id="hits")
@@ -380,8 +381,11 @@ if uploaded_file:
         st.subheader(f"Dotplot for Query {i+1}: {blast_record.query}")
         svg_canvas = generate_dotplot(blast_record)
         svg_bytes = svg_canvas.tostring().encode('utf-8')
-        png_bytes = cairosvg.svg2png(bytestring=svg_bytes)
-        st.image(png_bytes)
+        b64_svg = base64.b64encode(svg_bytes).decode('utf-8')
+        st.markdown(
+            f'<div style="text-align:center;"><img src="data:image/svg+xml;base64,{b64_svg}"/></div>',
+            unsafe_allow_html=True
+        )
 
         btn = st.download_button(
             label="Download SVG",
