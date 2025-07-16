@@ -2,228 +2,60 @@ import streamlit as st
 import pandas as pd
 import base64
 from Bio.Blast import NCBIXML
-from io import StringIO, BytesIO
 from svgwrite import Drawing
 from svgwrite.container import Group
 from svgwrite.shapes import Line
-from svgwrite.path import Path
 from svgwrite.text import Text
 
 
-def draw_hits(df, query_len, subject_len, total_width, total_height):
-    hit_group = Group(id="hits")
-    for index, row in df.iterrows():
-        qstart = int(total_width * int(row['qstart']) / query_len)
-        qend = int(total_width * int(row['qend']) / query_len)
-        sstart = int(total_height * int(row['sstart']) / subject_len)
-        send = int(total_height * int(row['send']) / subject_len)
-        pident = int(row['pident'])
-        if pident <= 60:
-            opacity = 0.4
-        elif 60 < pident <= 70:
-            opacity = 0.6
-        elif 70 < pident <= 80:
-            opacity = 0.8
-        elif 80 < pident <= 100:
-            opacity = 1
-        if (row['frame'][0] > 0 and row['frame'][1] > 0) or (
-                row['frame'][0] < 0 and row['frame'][1] < 0):
-            color = "#1f77b4"
-        else:
-            color = "#ff7f0e"
-        hit = Line(
-            start=(
-                qstart,
-                sstart),
-            end=(
-                qend,
-                send),
-            stroke=color,
-            stroke_opacity=opacity,
-            stroke_width=2,
-            fill='none')
-        hit_group.add(hit)
-    return hit_group
-
-
-def create_tick_label_paths_list(
-        ticks, total_span, seq_len, axis):
-    tick_label_paths_list = []
-
-    anchor_value = "middle"
-    baseline_value = "middle"
-    for tick in ticks:
-        if axis == "horizontal":
-            tick_label_x = total_span * (tick / seq_len)
-            tick_label_y = 0
-            angle = 'rotate(0,0, 0)'
-        elif axis == "vertical":
-            tick_label_x = 0
-            tick_label_y = total_span * (tick / seq_len)
-            angle = 'rotate({},{}, {})'.format(-90, tick_label_x, tick_label_y)
-        label_text = base_to_kbp(tick, seq_len)
-        label_path = Text(label_text, insert=(tick_label_x, tick_label_y),
-                          stroke='none',
-                          fill='black',
-                          font_size='10pt',
-                          font_weight="normal",
-                          font_family="Arial",
-                          text_anchor=anchor_value,
-                          dominant_baseline=baseline_value, transform=angle)
-        tick_label_paths_list.append(label_path)
-    return tick_label_paths_list
-
+# ==== Utility functions ====
 
 def base_to_kbp(tick, seq_len):
-    if seq_len < 5000:
-        tick_string = str(tick) + " bp"
-    elif 5000 <= seq_len < 1000000:
-        tick_string = str(int(tick / 1000)) + " kbp"
+    if seq_len < 5_000:
+        return f"{tick} bp"
+    elif seq_len < 1_000_000:
+        return f"{tick // 1_000} kbp"
     else:
-        tick_string = str(int(tick / 1000000)) + " Mbp"
-    return tick_string
-
-
-def create_tick_paths_list(ticks, tick_width, size, total_span, seq_len, axis):
-    tick_paths_list = []
-    ratio = {'small': [80, 70], 'large': [80, 60]}
-    prox, dist = ratio[size]
-    for tick in ticks:
-        if axis == "horizontal":
-            x1 = total_span * (tick / seq_len)
-            y1 = prox
-            x2 = total_span * (tick / seq_len)
-            y2 = dist
-        elif axis == "vertical":
-            x1 = dist
-            y1 = total_span * (tick / seq_len)
-            x2 = prox
-            y2 = total_span * (tick / seq_len)
-        tick_path_desc = "M " + str(x1) + "," + \
-            str(y1) + " L" + str(x2) + "," + str(y2)
-        tick_path = Path(
-            d=tick_path_desc,
-            stroke='black',
-            stroke_width=tick_width)
-        tick_paths_list.append(tick_path)
-    return tick_paths_list
-
-
-def create_grid_paths_list(ticks, tick_width, 
-                           total_width, total_height, seq_len, axis):
-    grid_paths_list = []
-    for tick in ticks:
-        if axis == "horizontal":
-            x1 = total_width * (tick / seq_len)
-            y1 = 0
-            x2 = total_width * (tick / seq_len)
-            y2 = total_height
-        elif axis == "vertical":
-            x1 = 0
-            y1 = total_height * (tick / seq_len)
-            x2 = total_width
-            y2 = total_height * (tick / seq_len)
-        grid_path_desc = "M " + str(x1) + "," + \
-            str(y1) + " L" + str(x2) + "," + str(y2)
-        grid_path = Path(
-            d=grid_path_desc,
-            stroke='#D3D3D3',
-            stroke_width=tick_width)
-        grid_paths_list.append(grid_path)
-    return grid_paths_list
-
-
-def create_ticks(seq_len, total_span, axis):
-    tick_large, tick_small = tick_size(seq_len)
-    tick_group = Group(id="tick")
-    ticks_large = list(range(0, seq_len, tick_large))
-    ticks_small = [
-        x for x in list(
-            range(
-                0,
-                seq_len,
-                tick_small)) if x %
-        tick_large != 0]
-    tick_paths_large = create_tick_paths_list(
-        ticks_large, 1, "large", total_span, seq_len, axis)
-    tick_paths_small = create_tick_paths_list(
-        ticks_small, 1, "small", total_span, seq_len, axis)
-    for tick_path_large in tick_paths_large:
-        tick_group.add(tick_path_large)
-    for tick_path_small in tick_paths_small:
-        tick_group.add(tick_path_small)
-    return tick_group
-
-
-def create_labels(seq_len, total_span, axis):
-    tick_large, tick_small = tick_size(seq_len)
-    label_group = Group(id="label")
-    ticks_large = list(range(0, seq_len, tick_large))
-    tick_small = list(range(0, seq_len, tick_small))
-    tick_label_paths_large = create_tick_label_paths_list(
-        ticks_large, total_span, seq_len, axis)
-    for tick_label_path_large in tick_label_paths_large:
-        label_group.add(tick_label_path_large)
-    return label_group
+        return f"{tick // 1_000_000} Mbp"
 
 
 def tick_size(seq_len):
-    if seq_len <= 1000:
-        tick_large, tick_small = 100, 10
-    elif 1000 < seq_len <= 5000:
-        tick_large, tick_small = 500, 100
-    elif 5000 < seq_len <= 10000:
-        tick_large, tick_small = 1000, 500
-    elif 10000 < seq_len <= 20000:
-        tick_large, tick_small = 2000, 1000
-    elif 20000 < seq_len <= 50000:
-        tick_large, tick_small = 5000, 1000
-    elif 50000 < seq_len <= 100000:
-        tick_large, tick_small = 10000, 1000
-    elif 100000 < seq_len <= 1000000:
-        tick_large, tick_small = 50000, 10000
-    elif 1000000 < seq_len <= 5000000:
-        tick_large, tick_small = 1000000, 200000
-    elif 5000000 < seq_len:
-        tick_large, tick_small = 1000000, 500000
-    return tick_large, tick_small
+    if seq_len <= 1_000:
+        return 100, 10
+    elif seq_len <= 5_000:
+        return 500, 100
+    elif seq_len <= 10_000:
+        return 1_000, 500
+    elif seq_len <= 20_000:
+        return 2_000, 1_000
+    elif seq_len <= 50_000:
+        return 5_000, 1_000
+    elif seq_len <= 100_000:
+        return 10_000, 1_000
+    elif seq_len <= 1_000_000:
+        return 50_000, 10_000
+    else:
+        return 1_000_000, 200_000
 
 
-def create_grids(seq_len, total_width, total_height, axis):
-    tick_large, tick_small = tick_size(seq_len)
-    grid_group = Group(id="grid")
-    grids_large = list(range(0, seq_len, tick_large))
-    grid_small = list(range(0, seq_len, tick_small))
-    grids_small = [x for x in grid_small if x % tick_large != 0]
-    grids_large_nonzero = [x for x in grids_large if x != 0]
-    grid_paths_large = create_grid_paths_list(
-        grids_large_nonzero,
-        1,
-        total_width,
-        total_height,
-        seq_len,
-        axis)
-    grid_paths_small = create_grid_paths_list(
-        grids_small, 1, total_width, total_height, seq_len, axis)
-    for grid_path_large in grid_paths_large:
-        grid_group.add(grid_path_large)
-    for grid_path_small in grid_paths_small:
-        grid_group.add(grid_path_small)
-    return grid_group
+def hsps_to_df(hsps, evalue_threshold, bitscore_threshold, identity_threshold):
+    data = []
+    for hsp in hsps:
+        pident = 100 * (hsp.identities / hsp.align_length)
+        if (
+            hsp.expect <= evalue_threshold
+            and hsp.bits >= bitscore_threshold
+            and pident >= identity_threshold
+        ):
+            data.append([
+                hsp.query_start, hsp.query_end,
+                hsp.sbjct_start, hsp.sbjct_end,
+                pident, hsp.frame
+            ])
+    return pd.DataFrame(data, columns=['qstart', 'qend', 'sstart', 'send', 'pident', 'frame'])
 
 
-def create_frame(total_width, total_height):
-    frame_group = Group(id="frame")
-    frame_path_desc = "M " + str(0) + "," + str(0) + " L" + str(total_width) + "," + str(0) + " L" + str(
-        total_width) + "," + str(total_height) + " L" + str(0) + "," + str(total_height) + "z"
-    frame_path = Path(
-        d=frame_path_desc,
-        stroke='black',
-        stroke_width=1,
-        fill="none")
-    frame_group.add(frame_path)
-    return frame_group
-
+# ==== Drawing functions ====
 
 def create_canvas(file_name, total_width, total_height):
     dwg = Drawing(
@@ -240,26 +72,115 @@ def create_canvas(file_name, total_width, total_height):
             str(total_height)))
     return dwg
 
+def draw_hits(df, query_len, subject_len, total_width, total_height, color_plus, color_minus, stroke_width):
+    hit_group = Group(id="hits")
+    for _, row in df.iterrows():
+        qstart = int(total_width * row['qstart'] / query_len)
+        qend = int(total_width * row['qend'] / query_len)
+        sstart = int(total_height * row['sstart'] / subject_len)
+        send = int(total_height * row['send'] / subject_len)
+        color = color_plus if (row['frame'][0] > 0 and row['frame'][1] > 0) or (row['frame'][0] < 0 and row['frame'][1] < 0) else color_minus
+        opacity = min(1, row['pident'] / 100)
+        hit = Line(
+            start=(qstart, sstart), end=(qend, send),
+            stroke=color, stroke_opacity=opacity,
+            stroke_width=stroke_width, fill='none'
+        )
+        hit_group.add(hit)
+    return hit_group
 
-def hsps_to_df(hsps):
-    header = ['qstart', 'qend', 'sstart', 'send', 'pident', 'frame']
-    hsp_lines = []
-    for hsp in hsps:
-        pident = 100 * (hsp.identities / hsp.align_length)
-        hsp_line = [
-            hsp.query_start,
-            hsp.query_end,
-            hsp.sbjct_start,
-            hsp.sbjct_end,
-            pident,
-            hsp.frame]
-        hsp_lines.append(hsp_line)
-    df = pd.DataFrame(hsp_lines, columns=header)
-    return df
+
+def create_frame(total_width, total_height, stroke_width=1, stroke_color="black"):
+    frame_group = Group(id="frame")
+    frame_path_desc = f"M0,0 L{total_width},0 L{total_width},{total_height} L0,{total_height} z"
+    frame_line = Drawing().path(d=frame_path_desc,
+                                stroke=stroke_color,
+                                stroke_width=stroke_width,
+                                fill="none")
+    frame_group.add(frame_line)
+    return frame_group
 
 
-def create_definition(total_span, title, axis):
-    definition_group = Group(id="definiton")
+def create_grids(
+    seq_len, total_width, total_height, axis,
+    grid_color_large, grid_width_large, grid_opacity_large,
+    grid_color_small, grid_width_small, grid_opacity_small
+):
+    group = Group(id="grids")
+    tick_large, tick_small = tick_size(seq_len)
+    grids_large = list(range(0, seq_len, tick_large))
+    grids_small = [x for x in range(0, seq_len, tick_small) if x % tick_large != 0]
+
+    # 大グリッド線
+    for tick in grids_large:
+        if tick == 0:
+            continue
+        if axis == "horizontal":
+            x1, y1, x2, y2 = total_width * tick / seq_len, 0, total_width * tick / seq_len, total_height
+        else:
+            x1, y1, x2, y2 = 0, total_height * tick / seq_len, total_width, total_height * tick / seq_len
+        grid_line = Line(
+            start=(x1, y1), end=(x2, y2),
+            stroke=grid_color_large,
+            stroke_width=grid_width_large,
+            stroke_opacity=grid_opacity_large
+        )
+        group.add(grid_line)
+
+    # 小グリッド線
+    for tick in grids_small:
+        if axis == "horizontal":
+            x1, y1, x2, y2 = total_width * tick / seq_len, 0, total_width * tick / seq_len, total_height
+        else:
+            x1, y1, x2, y2 = 0, total_height * tick / seq_len, total_width, total_height * tick / seq_len
+        grid_line = Line(
+            start=(x1, y1), end=(x2, y2),
+            stroke=grid_color_small,
+            stroke_width=grid_width_small,
+            stroke_opacity=grid_opacity_small
+        )
+        group.add(grid_line)
+
+    return group
+
+
+def create_ticks_labels(seq_len, total_span, axis, tick_color, font_size, label_color, font_family):
+    group = Group(id="ticks_labels")
+    tick_large, _ = tick_size(seq_len)
+    ticks_large = list(range(0, seq_len + 1, tick_large))
+
+    for tick in ticks_large:
+        if axis == "horizontal":
+            x1, y1, x2, y2 = total_span * tick / seq_len, -10, total_span * tick / seq_len, 0
+            text_x, text_y = total_span * tick / seq_len, -15
+            angle = f"rotate(0,{text_x},{text_y})"
+        else:
+            x1, y1, x2, y2 = -10, total_span * tick / seq_len, 0, total_span * tick / seq_len
+            text_x, text_y = -15, total_span * tick / seq_len
+            angle = f"rotate(-90,{text_x},{text_y})"
+
+        # Always draw tick line
+        tick_line = Line(start=(x1, y1), end=(x2, y2), stroke=tick_color, stroke_width=1)
+        group.add(tick_line)
+
+        # Skip label for tick=0
+        if tick != 0:
+            label_text = base_to_kbp(tick, seq_len)
+            label = Text(
+                label_text,
+                insert=(text_x, text_y),
+                fill=label_color,
+                font_size=f"{font_size}px",
+                font_family=font_family,
+                text_anchor="middle",
+                transform=angle
+            )
+            group.add(label)
+
+    return group
+
+
+def create_definition_label(text, total_span, axis, font_size, font_family):
     anchor_value = "middle"
     baseline_value = "middle"
     if axis == "horizontal":
@@ -271,128 +192,166 @@ def create_definition(total_span, title, axis):
         text_y = total_span * 0.5
         angle = 'rotate({},{}, {})'.format(-90, text_x, text_y)
 
-    definition_text = "{}".format(title)
-    definition_path = Text(definition_text, insert=(text_x, text_y),
-                           stroke='none',
-                           fill='black',
-                           font_size='15pt',
-                           font_weight="normal",
-                           font_family="Arial",
-                           text_anchor=anchor_value,
-                           dominant_baseline=baseline_value, transform=angle)
+    label = Text(
+        text,
+        insert=(text_x, text_y),
+        fill="black",
+        font_size=f"{font_size}px",
+        font_family=font_family,
+        text_anchor=anchor_value,
+        dominant_baseline=baseline_value,
+        transform=angle
+    )
+    return label
 
-    definition_group.add(definition_path)
 
-    return definition_group
-    
-def generate_dotplot(blast_record):
-    offset = 80
-    figsize = 1000
-    filename = "output"
-    query_id = blast_record.query_id
-    query_title = blast_record.query
+def generate_dotplot(
+    blast_record, output_file, figsize, offset,
+    evalue_threshold, bitscore_threshold, identity_threshold,
+    color_plus, color_minus, stroke_width,
+    grid_color_large, grid_width_large, grid_opacity_large,
+    grid_color_small, grid_width_small, grid_opacity_small,
+    tick_color, label_color, label_font_size,
+    frame_color, frame_width, font_family
+):
+    if not blast_record.alignments:
+        return None
+
     query_len = blast_record.query_length
     subject_len = blast_record.alignments[0].length
     max_len = max(query_len, subject_len)
     total_width = int(figsize * query_len / max_len)
     total_height = int(figsize * subject_len / max_len)
-    canvas = create_canvas(filename, total_width + offset, total_height + offset)
 
+    canvas = Drawing(filename=output_file, size=(f"{total_width + offset}px", f"{total_height + offset}px"))
+
+    # Grids
+    grids_horizontal = create_grids(
+        query_len, total_width, total_height, "horizontal",
+        grid_color_large, grid_width_large, grid_opacity_large,
+        grid_color_small, grid_width_small, grid_opacity_small
+    )
+    grids_horizontal.translate(offset, offset)
+    canvas.add(grids_horizontal)
+
+    grids_vertical = create_grids(
+        subject_len, total_width, total_height, "vertical",
+        grid_color_large, grid_width_large, grid_opacity_large,
+        grid_color_small, grid_width_small, grid_opacity_small
+    )
+    grids_vertical.translate(offset, offset)
+    canvas.add(grids_vertical)
+
+    # Ticks and labels
+    ticks_labels_horizontal = create_ticks_labels(query_len, total_width, "horizontal", tick_color, label_font_size, label_color, font_family)
+    ticks_labels_horizontal.translate(offset, offset)
+    canvas.add(ticks_labels_horizontal)
+
+    ticks_labels_vertical = create_ticks_labels(subject_len, total_height, "vertical", tick_color, label_font_size, label_color, font_family)
+    ticks_labels_vertical.translate(offset, offset)
+    canvas.add(ticks_labels_vertical)
+
+    # Definition labels
+    query_label = create_definition_label(blast_record.query, total_width, "horizontal", label_font_size + 2, font_family)
+    query_label.translate(offset, 20)
+    canvas.add(query_label)
+
+    subject_label = create_definition_label(blast_record.alignments[0].hit_def, total_height, "vertical", label_font_size + 2, font_family)
+    subject_label.translate(20, 20)
+    canvas.add(subject_label)
+
+    # Frame
+    frame_group = create_frame(total_width, total_height, stroke_width=frame_width, stroke_color=frame_color)
+    frame_group.translate(offset, offset)
+    canvas.add(frame_group)
+
+    # Hits
     for alignment in blast_record.alignments:
-
-        subject_id = alignment.accession
-        subject_title = alignment.hit_def
-        subject_len = alignment.length
-        msg = (
-            "Subject:\n    ID: {}\n    Title: {}\n    Length: {}".format(
-                subject_id, subject_title, subject_len))
-        max_len = max(query_len, subject_len)
-        total_width = int(figsize * query_len / max_len)
-        total_height = int(figsize * subject_len / max_len)
-
-        df = hsps_to_df(alignment.hsps)
-
-        canvas = create_canvas(
-            filename, total_width + offset, total_height + offset)
-
-        grids_horizontal = create_grids(
-            query_len, total_width, total_height, "horizontal")
-        grids_horizontal.translate(offset, offset)
-        canvas.add(grids_horizontal)
-
-        grids_vertical = create_grids(
-            subject_len, total_width, total_height, "vertical")
-        grids_vertical.translate(offset, offset)
-        canvas.add(grids_vertical)
-
+        df = hsps_to_df(
+            alignment.hsps,
+            evalue_threshold, bitscore_threshold, identity_threshold
+        )
+        if df.empty:
+            continue
         hits = draw_hits(
-            df,
-            query_len,
-            subject_len,
-            total_width,
-            total_height)
+            df, query_len, subject_len,
+            total_width, total_height,
+            color_plus, color_minus, stroke_width
+        )
         hits.translate(offset, offset)
         canvas.add(hits)
-
-        ticks_hotizontal = create_ticks(
-            query_len, total_width, "horizontal")
-        ticks_hotizontal.translate(offset, 0)
-        canvas.add(ticks_hotizontal)
-
-        ticks_vertical = create_ticks(
-            subject_len, total_height, "vertical")
-        ticks_vertical.translate(0, offset)
-        canvas.add(ticks_vertical)
-
-        labels_horizontal = create_labels(
-            query_len, total_width, "horizontal")
-        labels_horizontal.translate(offset, 50)
-        canvas.add(labels_horizontal)
-
-        labels_vertical = create_labels(
-            subject_len, total_height, "vertical")
-        labels_vertical.translate(50, offset)
-        canvas.add(labels_vertical)
-
-        definition_horizontal = create_definition(
-            total_width, query_title, "horizontal")
-        definition_horizontal.translate(offset, 20)
-        canvas.add(definition_horizontal)
-
-        definition_vertical = create_definition(
-            total_height, subject_title, "vertical")
-        definition_vertical.translate(20, 20)
-        canvas.add(definition_vertical)
-
-        frame_group = create_frame(total_width, total_height)
-        frame_group.translate(offset, offset)
-        canvas.add(frame_group)
     return canvas
 
+
+# ==== Streamlit App ====
+
 st.title("blast2dotplot")
+st.markdown(
+    "This app generates a dotplot from BLASTN/TBLASTX XML results (-outfmt 5). "
+    "It visualizes the alignment of sequences in a two-dimensional plot, "
+    "where each dot represents a hit between the query and subject sequences."
+)
+
+# Session state for SVG
+if "svg_bytes" not in st.session_state:
+    st.session_state.svg_bytes = None
+    st.session_state.output_file = "dotplot.svg"
 
 uploaded_file = st.file_uploader("Upload BLAST XML (-outfmt 5)", type="xml")
 
-if uploaded_file:
-    blast_records = list(NCBIXML.parse(uploaded_file))
-    st.success(f"Loaded {len(blast_records)} BLAST records")
+output_file = st.text_input("Output SVG file name:", st.session_state.output_file)
+figsize = st.sidebar.slider("Figure Size (px)", 500, 3000, 1000, step=10)
+frame_width = st.sidebar.slider("Frame Line Width", 1, 5, 1)
+stroke_width = st.sidebar.slider("Hit Line Width", 1, 10, 2)
+label_font_size = st.sidebar.slider("Label Font Size", 8, 20, 16, step=1)
+font_family = st.sidebar.selectbox("Font Family", ["Arial"], index=0)
+offset = st.sidebar.slider("Offset (px)", 10, 200, 80, step=1)
 
-    for i, blast_record in enumerate(blast_records):
-        st.subheader(f"Dotplot for Query {i+1}: {blast_record.query}")
-        svg_canvas = generate_dotplot(blast_record)
-        svg_bytes = svg_canvas.tostring().encode('utf-8')
-        b64_svg = base64.b64encode(svg_bytes).decode('utf-8')
-        st.markdown(
-            f'<div style="text-align:center;"><img src="data:image/svg+xml;base64,{b64_svg}"/></div>',
-            unsafe_allow_html=True
-        )
+frame_color = st.sidebar.color_picker("Frame Color", "#000000")
+tick_color = st.sidebar.color_picker("Tick Color", "#000000")
+label_color = st.sidebar.color_picker("Label Color", "#000000")
+grid_color_large = st.sidebar.color_picker("Large Grid Color", "#D3D3D3")
+grid_color_small = st.sidebar.color_picker("Small Grid Color", "#D3D3D3")
+color_plus = st.sidebar.color_picker("Color (+ frame)", "#1f77b4")
+color_minus = st.sidebar.color_picker("Color (- frame)", "#ff7f0e")
 
-        btn = st.download_button(
-            label="Download SVG",
-            data=svg_bytes,
-            file_name=f"dotplot_query_{i+1}.svg",
-            mime="image/svg+xml"
-        )
+evalue_threshold = st.sidebar.number_input("Max E-value", value=1e-2, format="%.1e")
+bitscore_threshold = st.sidebar.number_input("Min Bitscore", value=50.0)
+identity_threshold = st.sidebar.number_input("Min Identity (%)", value=30.0)
+
+if st.button("RUN"):
+    if uploaded_file is None:
+        st.error("Please upload a BLAST XML file first.")
+    else:
+        blast_records = list(NCBIXML.parse(uploaded_file))
+        if blast_records:
+            svg_canvas = generate_dotplot(
+                blast_records[0], output_file, figsize, offset,
+                evalue_threshold, bitscore_threshold, identity_threshold,
+                color_plus, color_minus, stroke_width,
+                grid_color_large, 1, 1.0,
+                grid_color_small, 1, 0.5,
+                tick_color, label_color, label_font_size,
+                frame_color, frame_width, font_family
+            )
+            svg_bytes = svg_canvas.tostring().encode('utf-8')
+            st.session_state.svg_bytes = svg_bytes
+            st.session_state.output_file = output_file
+            st.success("Dotplot generated!")
+
+# Display existing SVG if available
+if st.session_state.svg_bytes:
+    b64_svg = base64.b64encode(st.session_state.svg_bytes).decode('utf-8')
+    st.markdown(
+        f'<div style="text-align:center;"><img src="data:image/svg+xml;base64,{b64_svg}"/></div>',
+        unsafe_allow_html=True
+    )
+    st.download_button(
+        label="Download SVG",
+        data=st.session_state.svg_bytes,
+        file_name=st.session_state.output_file,
+        mime="image/svg+xml"
+    )
 
 st.markdown("---")
 st.markdown(
