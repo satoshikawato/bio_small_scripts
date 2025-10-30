@@ -126,20 +126,96 @@ def _crop_and_shift_location(loc_before, loc_current, loc_next, crop_start_0, cr
             strand=loc_current.strand
         )
 
+def crop_and_shift_features(original_features, start_0, end_0):
+    """
+    Iterates over old features, crops/shifts them relative to the
+    crop window (start_0, end_0), and returns a new list of features.
+    """
+    new_features_list = []
+    for old_feature in original_features:
+        # Skip features that don't overlap the crop region
+        if not (old_feature.location.start < end_0 and old_feature.location.end > start_0):
+            continue
+
+        old_loc = old_feature.location
+        new_location = None 
+        
+        if isinstance(old_loc, CompoundLocation):
+            new_parts = []
+            num_parts = len(old_loc.parts)
+            for n in range(num_parts):
+                part = old_loc.parts[n]
+                
+                # Skip parts that don't overlap
+                if not (part.start < end_0 and part.end > start_0):
+                    continue
+                
+                # Determine neighboring parts for boundary checks
+                # (修正点: より安全なインデックス参照)
+                part_before = old_loc.parts[n - 1] if n > 0 else None
+                part_next = old_loc.parts[n + 1] if n < (num_parts - 1) else None
+                
+                new_part = _crop_and_shift_location(part_before, part, part_next, start_0, end_0)
+                new_parts.append(new_part)
+            
+            if not new_parts:
+                continue # No parts of this compound feature survived the crop
+            
+            if len(new_parts) == 1:
+                new_location = new_parts[0] # Downgrade to simple location
+            else:
+                new_location = CompoundLocation(new_parts, operator=old_loc.operator)
+        
+        else: # It's a simple FeatureLocation
+            part_before = None
+            part_next = None
+            new_location = _crop_and_shift_location(part_before, old_loc, part_next, start_0, end_0)
+        
+        # Create and add the new feature
+        new_feature = SeqFeature(
+            location=new_location,
+            type=old_feature.type,
+            qualifiers=old_feature.qualifiers, 
+            id=old_feature.id
+        )
+        new_features_list.append(new_feature)
+        
+    return new_features_list
+
+
+def write_cropped_genbank(record_to_write, out_filepath, original_accession, start_1based, end_1based):
+    """
+    Writes the SeqRecord to a file, modifying the ACCESSION line
+    to include the cropped REGION.
+    """
+    temp_handle = StringIO()  
+    SeqIO.write(record_to_write, temp_handle, "genbank")  
+    content = temp_handle.getvalue()  
+    
+    # Add REGION to ACCESSION line
+    content = re.sub(  
+        rf'ACCESSION\s+{original_accession}',  
+        f'ACCESSION   {original_accession} REGION: {start_1based}..{end_1based}',  
+        content  
+    )  
+
+    with open(out_filepath, 'w') as f:  
+        f.write(content)
 
 def main():
+    # 1. Setup
     args = _get_args()
     in_gbk = args.input
     out_gbk = args.output
-    start = args.start
-    end = args.end
+    start_1 = args.start
+    end_1 = args.end
     
+    # 2. Load and Validate
     record = gbk_to_seqrecord(in_gbk)
-    start_0, end_0 = check_start_end_coords(record, start, end)
+    start_0, end_0 = check_start_end_coords(record, start_1, end_1)
 
+    # 3. Crop Sequence and Create New Record
     new_seq = record.seq[start_0:end_0]
-
-
     new_record = SeqRecord(
         new_seq,
         id=record.id,
@@ -149,70 +225,12 @@ def main():
         annotations=record.annotations
     )
     
-    for old_feature in record.features:
-        if old_feature.location.start < end_0 and old_feature.location.end > start_0:
-            old_loc = old_feature.location
-            
-            new_location = None 
-            
-            if isinstance(old_loc, CompoundLocation):
-                new_parts = []
-                for n in range(len(old_loc.parts)):
-                    if old_loc.parts[n].start < end_0 and old_loc.parts[n].end > start_0:
-                        if n == 0:
-                            part_before = None
-                            part = old_loc.parts[n]
-                            part_next = old_loc.parts[n+1]
-                        elif n >= len(old_loc.parts) -1:
-                            part_before = old_loc.parts[n-1]
-                            part = old_loc.parts[n]
-                            part_next = None
-                        else:
-                            part_before = old_loc.parts[n-1]
-                            part = old_loc.parts[n]
-                            part_next = old_loc.parts[n+1]
-                    else:
-                        continue
-                    new_part = _crop_and_shift_location(part_before, part, part_next, start_0, end_0)
-                    new_parts.append(new_part)
+    # 4. Process Features (Extracted Function)
+    new_record.features = crop_and_shift_features(record.features, start_0, end_0)
 
-                
-                if not new_parts:
-                    continue 
+    # 5. Write Output (Extracted Function)
+    original_accession = record.annotations['accessions'][0]
+    write_cropped_genbank(new_record, out_gbk, original_accession, start_1, end_1)
 
-                if len(new_parts) == 1:
-                    new_location = new_parts[0]
-                else:
-                    new_location = CompoundLocation(new_parts, operator=old_loc.operator)
-            
-            else:
-                part_before = None
-                part_next = None
-                new_location = _crop_and_shift_location(part_before, old_loc, part_next, start_0, end_0)
-            
-            new_feature = SeqFeature(
-                location=new_location,
-                type=old_feature.type,
-                qualifiers=old_feature.qualifiers, 
-                id=old_feature.id
-            )
-            
-            new_record.features.append(new_feature)
-
-    original_accession = record.annotations['accessions'][0]  
-    
-
-    temp_handle = StringIO()  
-    SeqIO.write(new_record, temp_handle, "genbank")  
-    content = temp_handle.getvalue()  
-    
-    content = re.sub(  
-        rf'ACCESSION\s+{original_accession}',  
-        f'ACCESSION   {original_accession} REGION: {args.start}..{args.end}',  
-        content  
-    )  
-
-    with open(out_gbk, 'w') as f:  
-        f.write(content)
 if __name__ == "__main__":
     main()
