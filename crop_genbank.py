@@ -95,6 +95,8 @@ def _crop_and_shift_location(loc_before, loc_current, loc_next, crop_start_0, cr
     if strand == 1:
         if loc_before and loc_before.end < crop_start_0:
             final_start_pos = BeforePosition(max(0, loc_current.start - crop_start_0))
+        elif loc_current.start < crop_start_0:
+            final_start_pos = BeforePosition(max(0, loc_current.start - crop_start_0))
         else:
             final_start_pos = max(0, loc_current.start - crop_start_0)
 
@@ -133,7 +135,7 @@ def crop_and_shift_features(original_features, start_0, end_0):
     """
     new_features_list = []
     for old_feature in original_features:
-        # Skip features that don't overlap the crop region
+
         if not (old_feature.location.start < end_0 and old_feature.location.end > start_0):
             continue
 
@@ -146,12 +148,9 @@ def crop_and_shift_features(original_features, start_0, end_0):
             for n in range(num_parts):
                 part = old_loc.parts[n]
                 
-                # Skip parts that don't overlap
                 if not (part.start < end_0 and part.end > start_0):
                     continue
                 
-                # Determine neighboring parts for boundary checks
-                # (修正点: より安全なインデックス参照)
                 part_before = old_loc.parts[n - 1] if n > 0 else None
                 part_next = old_loc.parts[n + 1] if n < (num_parts - 1) else None
                 
@@ -159,19 +158,18 @@ def crop_and_shift_features(original_features, start_0, end_0):
                 new_parts.append(new_part)
             
             if not new_parts:
-                continue # No parts of this compound feature survived the crop
+                continue 
             
             if len(new_parts) == 1:
-                new_location = new_parts[0] # Downgrade to simple location
+                new_location = new_parts[0] 
             else:
                 new_location = CompoundLocation(new_parts, operator=old_loc.operator)
         
-        else: # It's a simple FeatureLocation
+        else: 
             part_before = None
             part_next = None
             new_location = _crop_and_shift_location(part_before, old_loc, part_next, start_0, end_0)
         
-        # Create and add the new feature
         new_feature = SeqFeature(
             location=new_location,
             type=old_feature.type,
@@ -233,4 +231,4 @@ def main():
     write_cropped_genbank(new_record, out_gbk, original_accession, start_1, end_1)
 
 if __name__ == "__main__":
-    main()
+    main
