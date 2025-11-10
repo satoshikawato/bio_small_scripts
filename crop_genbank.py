@@ -231,4 +231,5 @@ def main():
     write_cropped_genbank(new_record, out_gbk, original_accession, start_1, end_1)
 
 if __name__ == "__main__":
-    main
+    main()
+    
