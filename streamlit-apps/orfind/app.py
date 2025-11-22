@@ -60,16 +60,25 @@ def fasta_to_records(in_fa):
     return seq_records
 
 def remove_nested_orfs(orf_list):
+    if not orf_list:
+        return []
+    orf_list.sort(key=lambda x: (x[0], -x[1]))
+    
     non_nested_orfs = []
-    for i in range(len(orf_list)):
-        is_nested = False
-        for j in range(len(orf_list)):
-            if i != j:
-                if orf_list[i][0] >= orf_list[j][0] and orf_list[i][1] <= orf_list[j][1]:
-                    is_nested = True
-                    break
-        if not is_nested:
-            non_nested_orfs.append(orf_list[i])
+    if not orf_list:
+        return non_nested_orfs
+        
+    last_added = orf_list[0]
+    non_nested_orfs.append(last_added)
+    
+    for i in range(1, len(orf_list)):
+        current_orf = orf_list[i]
+        if current_orf[1] <= last_added[1]:
+            continue 
+        else:
+            non_nested_orfs.append(current_orf)
+            last_added = current_orf
+            
     return non_nested_orfs
 
 def get_orf(record, trans_table, min_protein_length, keep_nested):
@@ -107,7 +116,9 @@ def get_orf(record, trans_table, min_protein_length, keep_nested):
                     break
     if not keep_nested:
         orf_list = remove_nested_orfs(orf_list)
-    orf_list.sort()
+    
+    orf_list.sort(key=lambda x: x[0])
+    
     zfill_len = int(len(str(len(orf_list)))+1)
     count = 0
     for orf in orf_list:
@@ -136,9 +147,8 @@ def orf_to_fna(orf_dict):
             faa_records.append(faa_record)
     return faa_records
 
-
 def get_gff3_features(orf_dict):
-    annot_lines = ''
+    annot_lines_list = []
     for key in orf_dict.keys():
         for orf in orf_dict[key]:
             seqid = key
@@ -155,9 +165,10 @@ def get_gff3_features(orf_dict):
             phase = "0"
             feature_id = orf[0]
             qualifers = "ID={};".format(feature_id)
-            annot_lines += "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
-                seqid, source, feature_type, start, end, score, strand, phase, qualifers)
-    return annot_lines
+            annot_lines_list.append("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
+                seqid, source, feature_type, start, end, score, strand, phase, qualifers))
+    
+    return "".join(annot_lines_list) 
 
 
 def main():
@@ -195,28 +206,22 @@ def main():
             SeqIO.write(fna_records, f, "fasta")
 
 # === Predict and cache ORFs ===
-@st.cache_data
 def predict_orfs(fasta_text, trans_table, min_protein_length, keep_nested):
-    # Generate SeqIO records from FASTA text
     stringio = StringIO(fasta_text)
     seq_records = list(SeqIO.parse(stringio, 'fasta'))
 
-    # Predict ORFs
     orf_dict = {}
     for record in seq_records:
         orf_dict[record.id] = get_orf(record, trans_table, min_protein_length, keep_nested)
 
-    # Generate GFF3 features
     gff3_str = get_gff3_features(orf_dict)
     gff3_bytes = BytesIO(gff3_str.encode())
 
-    # Generate FAA records
     faa_records = orf_to_faa(orf_dict)
     faa_text = StringIO()
     SeqIO.write(faa_records, faa_text, "fasta")
     faa_bytes = BytesIO(faa_text.getvalue().encode("utf-8"))
 
-    # Generate FNA records
     fna_records = orf_to_fna(orf_dict)
     fna_text = StringIO()
     SeqIO.write(fna_records, fna_text, "fasta")
@@ -231,7 +236,7 @@ codon_table_choices = [
     f"{table_id} ({table.names[0]})"
     for table_id, table in CodonTable.generic_by_id.items()
 ]
-codon_table_ids = list(CodonTable.generic_by_id.keys())  # List of table IDs
+codon_table_ids = list(CodonTable.generic_by_id.keys())
 
 # === Streamlit UI ===
 st.title("🧬 ORFIND v0.1.0")
@@ -244,13 +249,11 @@ def reset_results():
 
 uploaded_file = st.file_uploader("Upload FASTA file", on_change=reset_results)
 
-# Get basename for output files
 if uploaded_file:
     input_basename = os.path.splitext(uploaded_file.name)[0]
 else:
     input_basename = "out"
 
-# Text inputs for output file names
 gff3_name = st.text_input("GFF3 output file name", value=f"{input_basename}.gff3")
 faa_name = st.text_input("FAA output file name", value=f"{input_basename}.faa")
 fna_name = st.text_input("FNA output file name", value=f"{input_basename}.fna")
@@ -265,7 +268,6 @@ if st.button("Run") and uploaded_file:
         if not fasta_text.lstrip().startswith(">"):
             st.error("❌ The uploaded file does not appear to be a valid FASTA file.")
         else:
-            # Fetch cached ORF predictions if available
             gff3_bytes, faa_bytes, fna_bytes, gff3_str, orf_count = predict_orfs(
                 fasta_text=fasta_text,
                 trans_table=trans_table,
@@ -281,7 +283,6 @@ if st.button("Run") and uploaded_file:
     
             st.success(f"Done! Found a total of {orf_count} ORFs.")
 
-# === Download Output Files ===
 st.subheader("📄 Output files")
 if 'gff3_bytes' in st.session_state:
     st.text_area("GFF3 Output", st.session_state.gff3_str, height=300)
@@ -295,7 +296,6 @@ if 'fna_bytes' in st.session_state:
     st.text_area("FNA Output", st.session_state.fna_bytes.getvalue().decode("utf-8"), height=300)
     st.download_button("Download CDSs (FNA)", st.session_state.fna_bytes,
                 file_name=fna_name, mime="text/plain")
-
 
 st.markdown("---")
 st.markdown(
