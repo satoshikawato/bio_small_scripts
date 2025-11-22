@@ -55,7 +55,6 @@ def get_args():
         sys.exit(1)
     return args
 
-@st.cache_resource
 def fasta_to_records(in_fa):
     seq_records = [record for record in SeqIO.parse(in_fa, 'fasta')]
     return seq_records
@@ -196,10 +195,10 @@ def main():
             SeqIO.write(fna_records, f, "fasta")
 
 # === Predict and cache ORFs ===
-@st.cache_resource
-def predict_orfs(_fasta_text, trans_table, min_protein_length, keep_nested):
+@st.cache_data
+def predict_orfs(fasta_text, trans_table, min_protein_length, keep_nested):
     # Generate SeqIO records from FASTA text
-    stringio = StringIO(_fasta_text)
+    stringio = StringIO(fasta_text)
     seq_records = list(SeqIO.parse(stringio, 'fasta'))
 
     # Predict ORFs
@@ -237,7 +236,13 @@ codon_table_ids = list(CodonTable.generic_by_id.keys())  # List of table IDs
 # === Streamlit UI ===
 st.title("🧬 ORFIND v0.1.0")
 
-uploaded_file = st.file_uploader("Upload FASTA file")
+def reset_results():
+    keys_to_remove = ['gff3_bytes', 'faa_bytes', 'fna_bytes', 'gff3_str', 'orf_count']
+    for key in keys_to_remove:
+        if key in st.session_state:
+            del st.session_state[key]
+
+uploaded_file = st.file_uploader("Upload FASTA file", on_change=reset_results)
 
 # Get basename for output files
 if uploaded_file:
@@ -262,7 +267,7 @@ if st.button("Run") and uploaded_file:
         else:
             # Fetch cached ORF predictions if available
             gff3_bytes, faa_bytes, fna_bytes, gff3_str, orf_count = predict_orfs(
-                _fasta_text=fasta_text,
+                fasta_text=fasta_text,
                 trans_table=trans_table,
                 min_protein_length=min_len,
                 keep_nested=keep_nested
