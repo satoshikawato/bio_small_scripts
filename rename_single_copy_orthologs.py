@@ -26,7 +26,7 @@ def rename_fa(in_dir, out_dir, og_id, og_table):
         records = SeqIO.parse(infh,'fasta')
         for r in records:
             r_name = r.id
-            sp_name = og_table.loc[: , (og_table == r_name).any()].columns.values[0]
+            sp_name = og_table.columns[(og_table.apply(lambda x: x.str.contains(rf'\b{r_name}\b', na=False)).any())][0]
             r.id = sp_name 
             r.description = ''
             SeqIO.write(r, outfh, 'fasta')
