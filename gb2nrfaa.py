@@ -34,7 +34,12 @@ def _gb_record_to_proteins(gb_record):
                 protein_id = feature.qualifiers['protein_id'][0]
             else:
                 continue
-            gene_id = feature.qualifiers['gene'][0]
+            if 'locus_tag' in feature.qualifiers.keys():
+                gene_id = feature.qualifiers['locus_tag'][0]
+            elif 'gene' in feature.qualifiers.keys():
+                gene_id = feature.qualifiers['gene'][0]
+            else:
+                continue
             product_name = feature.qualifiers['product'][0]
             aa_seq = Seq(feature.qualifiers['translation'][0])
             aa_record = SeqRecord(aa_seq, id=protein_id,
